@@ -1,0 +1,46 @@
+set_tou_schedule:
+  name: Set TOU schedule
+  description: >
+    Write the Time-of-Use charge/discharge schedule to the inverter. The schedule
+    is stored server-side and followed by the inverter even if Home Assistant goes
+    offline. Call again (e.g. from an automation) to modify it.
+  fields:
+    periods:
+      name: Periods
+      required: true
+      description: >
+        List of TOU periods. Each: StartTime/EndTime "HH:MM",
+        ChargeOrDis (1=charge, 2=discharge), SOC (target %, 0-100),
+        RunPower (% 0-100), GridChargeEn (bool), SellGridEn (bool).
+      example: |
+        - StartTime: "00:00"
+          EndTime: "07:00"
+          ChargeOrDis: 1
+          SOC: 100
+          RunPower: 100
+          GridChargeEn: true
+          SellGridEn: false
+        - StartTime: "16:00"
+          EndTime: "21:00"
+          ChargeOrDis: 2
+          SOC: 20
+          RunPower: 100
+          GridChargeEn: false
+          SellGridEn: false
+      selector:
+        object:
+    reserved_soc:
+      name: Reserved SOC
+      description: Minimum battery SOC to reserve in TOU mode (%).
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    entry_id:
+      name: Config entry ID
+      description: Optional. Target a specific Pion station if you have more than one configured.
+      required: false
+      selector:
+        text:

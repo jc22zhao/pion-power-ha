@@ -18,8 +18,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import PionAuthError, PionClient
 from .const import (
     CONF_EMAIL,
+    CONF_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_STATION_CODE,
+    DEFAULT_RETRY_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -84,13 +86,22 @@ class PionConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class PionOptionsFlow(OptionsFlow):
-    """Options: polling interval."""
+    """Options: polling interval and app-coexistence retry interval."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        opts = self.config_entry.options
         schema = vol.Schema(
-            {vol.Required(CONF_SCAN_INTERVAL, default=current): vol.All(int, vol.Range(min=10, max=3600))}
+            {
+                vol.Required(
+                    CONF_SCAN_INTERVAL,
+                    default=opts.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                ): vol.All(int, vol.Range(min=10, max=3600)),
+                vol.Required(
+                    CONF_RETRY_INTERVAL,
+                    default=opts.get(CONF_RETRY_INTERVAL, DEFAULT_RETRY_INTERVAL),
+                ): vol.All(int, vol.Range(min=60, max=7200)),
+            }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

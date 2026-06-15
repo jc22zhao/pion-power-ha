@@ -132,3 +132,24 @@ class PionClient:
         res = await self._call("APPInterfaceServer/DeviceParam/SetStationWorkMode", payload)
         if str(res.get("Code")) != "1":
             raise PionApiError(res.get("Msg", "set work mode failed"))
+
+    async def set_tou_schedule(
+        self, station: str, periods: list[dict],
+        reserved_soc: int | None = None, ensure_tou_mode: bool = True,
+    ) -> None:
+        """Write the Time-of-Use schedule server-side (persists on the inverter).
+
+        periods: list of {StartTime, EndTime, ChargeOrDis(1=charge,2=discharge),
+        SOC, RunPower, GridChargeEn, SellGridEn}."""
+        current = await self.get_workmode(station)
+        if not current:
+            raise PionApiError("could not read current work mode")
+        payload = dict(current)
+        if ensure_tou_mode:
+            payload["EmsMode"] = 7  # TOU
+        if reserved_soc is not None:
+            payload["TOUModeReservedSoc"] = int(reserved_soc)
+        payload["TOUModeStraPeriods"] = periods
+        res = await self._call("APPInterfaceServer/DeviceParam/SetStationWorkMode", payload)
+        if str(res.get("Code")) != "1":
+            raise PionApiError(res.get("Msg", "set TOU schedule failed"))

@@ -30,7 +30,8 @@
       "init": {
         "title": "Pion Power options",
         "data": {
-          "scan_interval": "Polling interval (seconds)"
+          "scan_interval": "Polling interval (seconds)",
+          "retry_interval": "Reconnect retry interval after the app takes the session (seconds)"
         }
       }
     }

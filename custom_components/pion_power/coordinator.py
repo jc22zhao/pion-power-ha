@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import PionClient, PionKicked
-from .const import BACKOFF_SECONDS, DOMAIN
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,14 +19,18 @@ class PionCoordinator(DataUpdateCoordinator):
 
     Coexists with the mobile app on the single-session account:
     - `paused` (manual switch): HA does not touch the cloud at all.
-    - auto-yield: if the app grabs the session, HA backs off BACKOFF_SECONDS
-      before reclaiming, instead of immediately fighting for it.
+    - auto-yield: if the app grabs the session, HA backs off `retry_interval`
+      seconds before reclaiming, instead of immediately fighting for it.
     """
 
-    def __init__(self, hass: HomeAssistant, client: PionClient, station: str, interval: int) -> None:
+    def __init__(
+        self, hass: HomeAssistant, client: PionClient, station: str,
+        interval: int, retry_interval: int,
+    ) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=interval))
         self.client = client
         self.station = station
+        self.retry_interval = retry_interval
         self.paused = False
         self._yield_until = 0.0
         self._reclaim = False
@@ -55,11 +59,11 @@ class PionCoordinator(DataUpdateCoordinator):
             real = await self.client.get_realdata(self.station)
             workmode = await self.client.get_workmode(self.station)
         except PionKicked:
-            self._yield_until = time.time() + BACKOFF_SECONDS
+            self._yield_until = time.time() + self.retry_interval
             self._reclaim = True
             _LOGGER.info(
                 "Pion session taken by another client (mobile app); yielding %ss before reclaiming",
-                BACKOFF_SECONDS,
+                self.retry_interval,
             )
             return self._keep()
         except Exception as err:  # noqa: BLE001
