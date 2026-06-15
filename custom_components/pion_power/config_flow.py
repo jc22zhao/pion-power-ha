@@ -17,10 +17,12 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PionAuthError, PionClient
 from .const import (
+    CONF_ALLOW_WRITE,
     CONF_EMAIL,
     CONF_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_STATION_CODE,
+    DEFAULT_ALLOW_WRITE,
     DEFAULT_RETRY_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -86,7 +88,7 @@ class PionConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class PionOptionsFlow(OptionsFlow):
-    """Options: polling interval and app-coexistence retry interval."""
+    """Options: polling interval, app-coexistence retry interval, write enable."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -102,6 +104,10 @@ class PionOptionsFlow(OptionsFlow):
                     CONF_RETRY_INTERVAL,
                     default=opts.get(CONF_RETRY_INTERVAL, DEFAULT_RETRY_INTERVAL),
                 ): vol.All(int, vol.Range(min=60, max=7200)),
+                vol.Required(
+                    CONF_ALLOW_WRITE,
+                    default=opts.get(CONF_ALLOW_WRITE, DEFAULT_ALLOW_WRITE),
+                ): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

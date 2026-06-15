@@ -7,7 +7,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .entity import PionBaseEntity
+from .entity import PionBaseEntity, PionPeriodEntity, setup_period_entities
+
+# Per-period boolean fields: (draft key, name, icon).
+PERIOD_SWITCHES = [
+    ("GridChargeEn", "Grid Charge", "mdi:transmission-tower-import"),
+    ("SellGridEn", "Sell to Grid", "mdi:transmission-tower-export"),
+]
 
 
 async def async_setup_entry(
@@ -15,6 +21,14 @@ async def async_setup_entry(
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([PionCloudConnectionSwitch(coordinator, entry)])
+
+    def _factory(coord, ent, index):
+        return [
+            PionPeriodSwitch(coord, ent, index, key, name, icon)
+            for key, name, icon in PERIOD_SWITCHES
+        ]
+
+    setup_period_entities(coordinator, entry, async_add_entities, _factory)
 
 
 class PionCloudConnectionSwitch(PionBaseEntity, SwitchEntity):
@@ -45,3 +59,25 @@ class PionCloudConnectionSwitch(PionBaseEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs) -> None:
         self.coordinator.pause()
         self.async_write_ha_state()
+
+
+class PionPeriodSwitch(PionPeriodEntity, SwitchEntity):
+    """A boolean field of one TOU period (edits the draft; commit via Apply)."""
+
+    def __init__(self, coordinator, entry, index, key, name, icon) -> None:
+        super().__init__(coordinator, entry, index)
+        self._field = key
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_unique_id = f"{entry.entry_id}_period_{index}_{key}"
+
+    @property
+    def is_on(self) -> bool | None:
+        period = self._period
+        return None if period is None else bool(period.get(self._field))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        self.coordinator.edit_period(self._index, self._field, True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        self.coordinator.edit_period(self._index, self._field, False)

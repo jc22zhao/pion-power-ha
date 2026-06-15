@@ -45,3 +45,82 @@ set_tou_schedule:
       required: false
       selector:
         text:
+
+set_tou_template:
+  name: Set TOU template (full schedule)
+  description: >
+    Write the full, app-editable Time-of-Use template — the complete schedule
+    you see in the Pion app, supporting any shape: multiple seasonal date ranges,
+    separate weekday/weekend rules, and any number of periods. Requires "Allow
+    schedule writes" to be enabled in the integration options.
+    CAUTION: this re-pushes the schedule to the inverter (a live control action).
+    On AC-coupled systems, charge periods with GridChargeEn can curtail solar.
+  fields:
+    groups:
+      name: Rule groups
+      required: true
+      description: >
+        One or more rule-groups. Each group: optional date range
+        (start_month/start_day/end_month/end_day, default all year),
+        weeks (0=Sun..6=Sat, default every day), and periods. Each period:
+        StartTime/EndTime "HH:MM", SOC (% 0-100), RunPower (% 0-100),
+        ChargeOrDis (0=auto, 1=charge, 2=discharge), GridChargeEn, SellGridEn.
+      example: |
+        - start_month: 1
+          start_day: 1
+          end_month: 12
+          end_day: 31
+          weeks: [0, 1, 2, 3, 4, 5, 6]
+          periods:
+            - StartTime: "00:00"
+              EndTime: "07:00"
+              SOC: 20
+              RunPower: 100
+              ChargeOrDis: 0
+              GridChargeEn: true
+            - StartTime: "19:00"
+              EndTime: "23:00"
+              SOC: 15
+              RunPower: 76
+              ChargeOrDis: 2
+      selector:
+        object:
+    template_id:
+      name: Template ID
+      description: Optional. Which template to overwrite. Defaults to the station's active template.
+      required: false
+      selector:
+        text:
+    template_name:
+      name: Template name
+      description: Optional. Rename the template.
+      required: false
+      selector:
+        text:
+    reserved_soc:
+      name: Reserved SOC
+      description: Optional. Minimum battery SOC to reserve in TOU mode (%).
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    activate:
+      name: Activate
+      description: Activate this template after writing (default true).
+      required: false
+      selector:
+        boolean:
+    special_days:
+      name: Special days
+      description: Optional. Pass-through StraSpecialDayInfos list for special-date overrides.
+      required: false
+      selector:
+        object:
+    entry_id:
+      name: Config entry ID
+      description: Optional. Target a specific Pion station if you have more than one configured.
+      required: false
+      selector:
+        text:

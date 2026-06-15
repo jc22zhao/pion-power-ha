@@ -23,10 +23,13 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 - Battery / PV / Grid / Load power (kW)
 - Battery daily charge & discharge, PV daily energy (kWh)
 - HEMS online status
-- **TOU Schedule** — state is the number of configured Time-of-Use periods; its
-  attributes hold the full server-side schedule (`periods`, a humanized `summary`,
-  `reserved_soc`, `ems_mode`, and `tou_mode_active`). This is the read side of the
-  schedule; write it with the `set_tou_schedule` service below.
+- **TOU Schedule** — reads the **active TOU template** (the full, app-editable
+  schedule via `GetTouTemplateDetail`). State is the number of periods; attributes
+  hold the `periods`, a humanized `summary`, `template_name`, `reserved_soc`,
+  `ems_mode`, and `tou_mode_active`. Note: the workmode's `TOUModeStraPeriods` is
+  only a server-compiled subset (the grid-charge windows), so the sensor reads the
+  template instead and falls back to the workmode list only if the template is
+  unavailable.
 
 **Controls** (number entities — read-modify-write on the inverter's work mode)
 - Work Mode (raw `EmsMode`)
@@ -37,12 +40,33 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 Set the relevant parameters plus the matching **Work Mode** to, e.g., force-charge the battery
 during cheap grid hours, then return to self-consumption.
 
+**Schedule editor** (built-in entities — no custom dashboards or templates needed)
+
+Each period of your **active** TOU template appears as a **TOU Period N** sub-device with native
+entities — **Start**, **End** (time), **Mode** (select: Auto / Charge / Discharge), **Target SOC**,
+**Run Power** (number), **Grid Charge**, **Sell to Grid** (switch). The number of period devices
+tracks your schedule automatically.
+
+Edits are staged locally; the HEMS device has three buttons:
+- **Apply schedule** — write the staged schedule to the inverter (one write) and activate it.
+- **Reload schedule from server** — discard staged edits.
+- **Add TOU period** — append a new period (each period device also has a **Delete period** button).
+
+The integration reads only the *active* template; to switch which template is active, use the Pion
+app. Multi-group templates (separate weekday/weekend or seasonal rules) are shown in full by the
+**TOU Schedule** sensor; the period entities edit the primary rule-group.
+
+**Writes are off by default.** Enable *Allow schedule writes* in the integration options
+(Settings → Devices & Services → Pion Power → Configure) to allow Apply and the number/work-mode
+controls to push to the inverter. Until then the integration is read-only.
+
 **Services**
-- `pion_power.set_tou_schedule` — write the Time-of-Use schedule server-side (persists on the
-  inverter, followed even if HA is offline). Pass a `periods` list (each with `StartTime`,
-  `EndTime`, `ChargeOrDis` 1=charge/2=discharge, `SOC`, `RunPower`, `GridChargeEn`, `SellGridEn`)
-  and optional `reserved_soc`. View the current schedule on the **TOU Schedule** sensor, edit, and
-  call this to write it back — directly, from a dashboard button, or from an automation.
+- `pion_power.set_tou_template` — write the full schedule (any shape: multiple seasonal date
+  ranges, weekday/weekend groups, any number of periods). Pass `groups` (each with an optional date
+  range, `weeks`, and `periods`). Used by automations; the per-period entities above are the
+  point-and-click equivalent.
+- `pion_power.set_tou_schedule` — coarse write of the workmode grid-charge windows (`periods` list).
+  Both services require *Allow schedule writes*.
 
 ## Installation (via HACS)
 

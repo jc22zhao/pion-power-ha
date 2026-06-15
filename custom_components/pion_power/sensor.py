@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, HOME_SENSORS, SENSORS
 from .entity import PionBaseEntity
+from .schedule import humanize_groups, humanize_period, template_groups
 
 
 async def async_setup_entry(
@@ -56,27 +57,14 @@ class PionHomeSensor(_Base):
             return None
 
 
-def _humanize_period(p: dict) -> str:
-    """One-line summary of a TOU period for display."""
-    action = {1: "charge", 2: "discharge"}.get(p.get("ChargeOrDis"), "?")
-    parts = [
-        f"{p.get('StartTime', '?')}-{p.get('EndTime', '?')}",
-        f"{action} to {p.get('SOC', '?')}%",
-        f"@{p.get('RunPower', '?')}% power",
-    ]
-    if p.get("GridChargeEn"):
-        parts.append("grid-charge ON")
-    if p.get("SellGridEn"):
-        parts.append("sell-to-grid ON")
-    return "  ".join(parts)
-
-
 class PionTouScheduleSensor(PionBaseEntity, SensorEntity):
-    """Surfaces the server-side Time-of-Use schedule.
+    """Surfaces the active Time-of-Use schedule (any shape).
 
-    State = number of configured TOU periods. Attributes hold the full schedule
-    (raw + humanized), the reserved SOC, and whether TOU mode is currently active
-    (EmsMode 7). Modify it with the `pion_power.set_tou_schedule` service.
+    Reads the active TOU *template* (the full, app-editable schedule) and
+    represents it faithfully regardless of complexity — multiple seasonal date
+    ranges, separate weekday/weekend rules, special days. State = total number
+    of time periods across all rule-groups. Falls back to the workmode's
+    compiled period list only if no template is available.
     """
 
     _attr_icon = "mdi:calendar-clock"
@@ -87,23 +75,51 @@ class PionTouScheduleSensor(PionBaseEntity, SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_tou_schedule"
 
     @property
-    def _periods(self) -> list[dict]:
-        wm = self.coordinator.data.get("workmode", {}) or {}
-        periods = wm.get("TOUModeStraPeriods")
-        return periods if isinstance(periods, list) else []
+    def _template(self) -> dict:
+        return self.coordinator.data.get("template", {}) or {}
+
+    @property
+    def _groups(self) -> list[dict]:
+        return template_groups(self._template)
 
     @property
     def native_value(self):
-        return len(self._periods)
+        groups = self._groups
+        if groups:
+            return sum(len(g["periods"]) for g in groups)
+        wm = self.coordinator.data.get("workmode", {}) or {}
+        wm_periods = wm.get("TOUModeStraPeriods")
+        return len(wm_periods) if isinstance(wm_periods, list) else 0
 
     @property
     def extra_state_attributes(self):
         wm = self.coordinator.data.get("workmode", {}) or {}
-        periods = self._periods
+        template = self._template
+        groups = self._groups
+        special = template.get("StraSpecialDayInfos") or []
+
+        if groups:
+            source = "template"
+            # Convenience flat list for the simple single-group case.
+            periods = groups[0]["periods"] if len(groups) == 1 else [
+                p for g in groups for p in g["periods"]
+            ]
+            summary = humanize_groups(groups)
+        else:
+            source = "workmode"
+            wm_periods = wm.get("TOUModeStraPeriods")
+            periods = wm_periods if isinstance(wm_periods, list) else []
+            summary = [humanize_period(p) for p in periods]
+
         return {
             "tou_mode_active": str(wm.get("EmsMode")) == "7",
             "ems_mode": wm.get("EmsMode"),
             "reserved_soc": wm.get("TOUModeReservedSoc"),
-            "summary": [_humanize_period(p) for p in periods],
+            "template_name": template.get("_TemplateName") or template.get("TemplateName"),
+            "source": source,
+            "group_count": len(groups),
+            "special_day_count": len(special),
+            "summary": summary,
+            "groups": groups,
             "periods": periods,
         }

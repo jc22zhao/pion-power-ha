@@ -12,18 +12,30 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PionApiError, PionAuthError, PionClient
 from .const import (
+    CONF_ALLOW_WRITE,
     CONF_EMAIL,
     CONF_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_STATION_CODE,
+    DEFAULT_ALLOW_WRITE,
     DEFAULT_RETRY_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SERVICE_SET_TOU,
+    SERVICE_SET_TOU_TEMPLATE,
 )
 from .coordinator import PionCoordinator
+from .schedule import build_stra_day_periods
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SWITCH]
+PLATFORMS = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.NUMBER,
+    Platform.SWITCH,
+    Platform.TIME,
+    Platform.SELECT,
+    Platform.BUTTON,
+]
 
 PERIOD_SCHEMA = vol.Schema(
     {
@@ -43,6 +55,46 @@ SET_TOU_SCHEMA = vol.Schema(
         vol.Optional("reserved_soc"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
     }
 )
+
+# --- General template editing (handles any schedule shape) ---
+# A template period: RunPower/SOC are percentages (0-100); ChargeOrDis 0=auto
+# (hold/charge toward SOC, discharge above it), 1=charge, 2=discharge.
+TPL_PERIOD_SCHEMA = vol.Schema(
+    {
+        vol.Required("StartTime"): cv.string,
+        vol.Required("EndTime"): cv.string,
+        vol.Optional("SOC", default=100): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+        vol.Optional("RunPower", default=100): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+        vol.Optional("ChargeOrDis", default=0): vol.In([0, 1, 2]),
+        vol.Optional("GridChargeEn", default=False): cv.boolean,
+        vol.Optional("SellGridEn", default=False): cv.boolean,
+    }
+)
+# A rule-group: an optional date range + weekday set + its periods. Omitting the
+# date range means all year; omitting weeks means every day.
+TPL_GROUP_SCHEMA = vol.Schema(
+    {
+        vol.Optional("start_month", default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
+        vol.Optional("start_day", default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=31)),
+        vol.Optional("end_month", default=12): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
+        vol.Optional("end_day", default=31): vol.All(vol.Coerce(int), vol.Range(min=1, max=31)),
+        vol.Optional("weeks", default=[0, 1, 2, 3, 4, 5, 6]): [vol.In([0, 1, 2, 3, 4, 5, 6])],
+        vol.Required("periods"): [TPL_PERIOD_SCHEMA],
+    }
+)
+SET_TOU_TEMPLATE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Optional("template_id"): cv.string,
+        vol.Optional("template_name"): cv.string,
+        vol.Required("groups"): vol.All([TPL_GROUP_SCHEMA], vol.Length(min=1)),
+        vol.Optional("special_days"): list,
+        vol.Optional("reserved_soc"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+        vol.Optional("activate", default=True): cv.boolean,
+    }
+)
+
+
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -69,7 +121,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     retry = entry.options.get(CONF_RETRY_INTERVAL, DEFAULT_RETRY_INTERVAL)
-    coordinator = PionCoordinator(hass, client, station, interval, retry, device_code)
+    allow_write = entry.options.get(CONF_ALLOW_WRITE, DEFAULT_ALLOW_WRITE)
+    coordinator = PionCoordinator(
+        hass, client, station, interval, retry, device_code, allow_write
+    )
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -80,21 +135,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def _resolve_coordinator(hass: HomeAssistant, call: ServiceCall):
+    coordinators = hass.data.get(DOMAIN, {})
+    if not coordinators:
+        raise HomeAssistantError("Pion Power is not set up")
+    entry_id = call.data.get("entry_id")
+    if entry_id:
+        coordinator = coordinators.get(entry_id)
+        if coordinator is None:
+            raise HomeAssistantError(f"Unknown entry_id: {entry_id}")
+        return coordinator
+    return next(iter(coordinators.values()))
+
+
+def _require_write(coordinator) -> None:
+    if not coordinator.allow_write:
+        raise HomeAssistantError(
+            "Schedule writing is disabled. Enable 'Allow schedule writes' in the "
+            "Pion Power integration options once your system is healthy."
+        )
+
+
 def _async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, SERVICE_SET_TOU):
         return
 
     async def _set_tou(call: ServiceCall) -> None:
-        coordinators = hass.data.get(DOMAIN, {})
-        if not coordinators:
-            raise HomeAssistantError("Pion Power is not set up")
-        entry_id = call.data.get("entry_id")
-        if entry_id:
-            coordinator = coordinators.get(entry_id)
-            if coordinator is None:
-                raise HomeAssistantError(f"Unknown entry_id: {entry_id}")
-        else:
-            coordinator = next(iter(coordinators.values()))
+        coordinator = _resolve_coordinator(hass, call)
+        _require_write(coordinator)
         try:
             await coordinator.client.set_tou_schedule(
                 coordinator.station, call.data["periods"], call.data.get("reserved_soc")
@@ -103,7 +171,51 @@ def _async_register_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(f"Failed to set TOU schedule: {err}") from err
         await coordinator.async_request_refresh()
 
+    async def _set_tou_template(call: ServiceCall) -> None:
+        coordinator = _resolve_coordinator(hass, call)
+        _require_write(coordinator)
+        client = coordinator.client
+        template_id = call.data.get("template_id")
+        try:
+            # Default to the station's active template; preserve its metadata so
+            # we only replace the schedule, not name/description/geo.
+            if not template_id:
+                tpls = await client.get_station_tou_templates(coordinator.station)
+                active = next(
+                    (t for t in (tpls.get("StationTous") or []) if t.get("StraEn")), None
+                )
+                if active:
+                    template_id = active.get("TemplateId")
+            base = {}
+            if template_id:
+                base = await client.get_tou_template_detail(template_id) or {}
+            payload = {k: v for k, v in base.items() if not k.startswith("_")}
+            payload["CompanyCode"] = base.get("CompanyCode") or "PionPower"
+            if template_id:
+                payload["TemplateId"] = template_id
+            if call.data.get("template_name"):
+                payload["TemplateName"] = call.data["template_name"]
+            payload.setdefault("TemplateName", "Home Assistant")
+            payload["StraDayPeriods"] = build_stra_day_periods(call.data["groups"])
+            payload["StraSpecialDayInfos"] = call.data.get(
+                "special_days", payload.get("StraSpecialDayInfos") or []
+            )
+            result = await client.add_or_update_template(payload)
+            new_id = result.get("TemplateId") or template_id
+            if call.data.get("activate", True) and new_id:
+                await client.choose_tou_template(coordinator.station, new_id)
+            if call.data.get("reserved_soc") is not None:
+                await client.set_workmode_field(
+                    coordinator.station, "TOUModeReservedSoc", int(call.data["reserved_soc"])
+                )
+        except PionApiError as err:
+            raise HomeAssistantError(f"Failed to set TOU template: {err}") from err
+        await coordinator.async_request_refresh()
+
     hass.services.async_register(DOMAIN, SERVICE_SET_TOU, _set_tou, schema=SET_TOU_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_TOU_TEMPLATE, _set_tou_template, schema=SET_TOU_TEMPLATE_SCHEMA
+    )
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -117,4 +229,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_SET_TOU)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_TOU_TEMPLATE)
     return unload_ok

@@ -154,6 +154,47 @@ class PionClient:
         if str(res.get("Code")) != "1":
             raise PionApiError(res.get("Msg", "set TOU schedule failed"))
 
+    async def get_station_tou_templates(self, station: str) -> dict:
+        """Station's TOU templates. The active one has StraEn=true; its TemplateId
+        feeds get_tou_template_detail for the full multi-period schedule."""
+        data = await self._call(
+            "AppInterfaceServer/EsStrategy/GetStationTouTemplateList", {"StationCode": station}
+        )
+        return data.get("Data") or {}
+
+    async def get_tou_template_detail(self, template_id: str) -> dict:
+        """Full definition of a TOU template (the complete app-editable schedule).
+
+        Structure: StraDayPeriods[] -> StraWeekInfos[] -> StraTimePeriods[], each
+        period {StartTime, EndTime, RunPower(% x100), SOC, ChargeOrDis, GridChargeEn,
+        SellGridEn}. This is the real schedule; the workmode's TOUModeStraPeriods is
+        only a server-compiled subset (the grid-charge windows)."""
+        data = await self._call(
+            "AppInterfaceServer/EsStrategy/GetTouTemplateDetail", {"TemplateId": template_id}
+        )
+        return data.get("Data") or {}
+
+    async def add_or_update_template(self, template: dict) -> dict:
+        """Create/update a customer TOU template. `template` mirrors the object
+        returned by get_tou_template_detail (CompanyCode, TemplateId, TemplateName,
+        StraDayPeriods, StraSpecialDayInfos, ...). RunPower in periods is percent
+        x100, as the API expects. Returns the API Data (incl. the TemplateId)."""
+        res = await self._call(
+            "AppInterfaceServer/EsStrategy/AddOrUpdateCustomerStraTemplate", template
+        )
+        if str(res.get("Code")) != "1":
+            raise PionApiError(res.get("Msg", "add/update template failed"))
+        return res.get("Data") or {}
+
+    async def choose_tou_template(self, station: str, template_id: str) -> None:
+        """Activate a TOU template for a station (StraEn true on it, others off)."""
+        res = await self._call(
+            "AppInterfaceServer/EsStrategy/ChooseTouTemplate",
+            {"StationCode": station, "TemplateId": template_id},
+        )
+        if str(res.get("Code")) != "1":
+            raise PionApiError(res.get("Msg", "choose template failed"))
+
     async def get_devices(self, station: str) -> list[dict]:
         data = await self._call("AppInterfaceServer/Config/GetDeviceList", {"StationCode": station})
         return data.get("Data") or []

@@ -31,7 +31,8 @@
         "title": "Pion Power options",
         "data": {
           "scan_interval": "Polling interval (seconds)",
-          "retry_interval": "Reconnect retry interval after the app takes the session (seconds)"
+          "retry_interval": "Reconnect retry interval after the app takes the session (seconds)",
+          "allow_schedule_write": "Allow schedule writes (re-pushes the TOU schedule to the inverter)"
         }
       }
     }

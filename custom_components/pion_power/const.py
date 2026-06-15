@@ -13,8 +13,14 @@ CONF_EMAIL = "email"
 CONF_STATION_CODE = "station_code"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_RETRY_INTERVAL = "retry_interval"
+# Schedule writes re-push the TOU schedule to the inverter (a live control
+# action). Off by default so a fresh install is read-only until the owner opts
+# in via the integration options.
+CONF_ALLOW_WRITE = "allow_schedule_write"
+DEFAULT_ALLOW_WRITE = False
 
 SERVICE_SET_TOU = "set_tou_schedule"
+SERVICE_SET_TOU_TEMPLATE = "set_tou_template"
 
 # Real-time sensors from GetRealDataByStationCode:
 # (key, friendly name, unit, device_class, state_class)

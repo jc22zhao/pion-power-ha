@@ -1,8 +1,13 @@
 """Shared base entity for Pion Power."""
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -23,3 +28,55 @@ class PionBaseEntity(CoordinatorEntity[PionCoordinator]):
             manufacturer="Pion Power / Hoymiles",
             model="HAS-7.6LV-USG1",
         )
+
+
+class PionPeriodEntity(CoordinatorEntity[PionCoordinator]):
+    """Base for an entity that edits one TOU period (its own sub-device)."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: PionCoordinator, entry: ConfigEntry, index: int) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._index = index
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_period_{index}")},
+            name=f"TOU Period {index + 1}",
+            manufacturer="Pion Power / Hoymiles",
+            model="TOU period",
+            via_device=(DOMAIN, entry.entry_id),
+        )
+
+    @property
+    def _period(self) -> dict | None:
+        draft = self.coordinator.get_draft()
+        return draft[self._index] if 0 <= self._index < len(draft) else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._period is not None
+
+
+def setup_period_entities(
+    coordinator: PionCoordinator,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+    factory: Callable[[PionCoordinator, ConfigEntry, int], list[Entity]],
+) -> None:
+    """Create per-period entities to match the current draft length, adding more
+    as the draft grows (dynamic count). Entities for removed periods stay
+    registered but report unavailable."""
+    created: set[int] = set()
+
+    @callback
+    def _sync() -> None:
+        new: list[Entity] = []
+        for i in range(len(coordinator.get_draft())):
+            if i not in created:
+                created.add(i)
+                new.extend(factory(coordinator, entry, i))
+        if new:
+            async_add_entities(new)
+
+    _sync()
+    entry.async_on_unload(coordinator.async_add_listener(_sync))
