@@ -1,0 +1,12 @@
+{
+  "domain": "pion_power",
+  "name": "Pion Power (Hoymiles HAS)",
+  "version": "0.1.0",
+  "codeowners": ["@jc22zhao"],
+  "config_flow": true,
+  "documentation": "https://github.com/jc22zhao/pion-power-ha",
+  "issue_tracker": "https://github.com/jc22zhao/pion-power-ha/issues",
+  "iot_class": "cloud_polling",
+  "integration_type": "hub",
+  "requirements": []
+}

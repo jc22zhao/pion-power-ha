@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pion Power",
+        "description": "Enter the login you use for the Pion Power app.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "station": {
+        "title": "Select your station",
+        "data": {
+          "station_code": "Station"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Could not connect to the Pion server.",
+      "no_stations": "No stations were found for this account."
+    },
+    "abort": {
+      "already_configured": "This station is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pion Power options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  }
+}
