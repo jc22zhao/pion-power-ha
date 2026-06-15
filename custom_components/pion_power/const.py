@@ -15,8 +15,6 @@ CONF_SCAN_INTERVAL = "scan_interval"
 CONF_RETRY_INTERVAL = "retry_interval"
 
 SERVICE_SET_TOU = "set_tou_schedule"
-SERVICE_FORCE_CHARGE = "force_charge"
-SERVICE_FORCE_DISCHARGE = "force_discharge"
 
 # Real-time sensors from GetRealDataByStationCode:
 # (key, friendly name, unit, device_class, state_class)

@@ -9,6 +9,12 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 > Pion Power app's own cloud API. It is not affiliated with or endorsed by Pion Power or Hoymiles,
 > and it could break if they change their API. Control commands change your live battery's behaviour
 > — understand what each setting does before automating it.
+>
+> ⚠️ **AC-coupled solar caution.** If your PV is AC-coupled (microinverters), be careful with
+> battery **charge** control — especially **grid-charge**. The HAS can respond by curtailing your
+> solar output (sometimes to 0%) via its export management, and the curtailment can latch. Prefer
+> normal TOU scheduling and avoid forcing grid-charge unless you understand this interaction.
+> (Earlier `force_charge`/`force_discharge` services were removed in 0.5.0 for this reason.)
 
 ## Features
 

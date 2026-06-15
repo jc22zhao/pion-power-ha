@@ -1,9 +1,12 @@
 set_tou_schedule:
   name: Set TOU schedule
   description: >
-    Write the Time-of-Use charge/discharge schedule to the inverter. The schedule
-    is stored server-side and followed by the inverter even if Home Assistant goes
-    offline. Call again (e.g. from an automation) to modify it.
+    Write the Time-of-Use charge/discharge schedule to the inverter. Stored
+    server-side and followed even if Home Assistant is offline. Call again
+    (e.g. from an automation) to modify it.
+    CAUTION: on AC-coupled systems (microinverters), enabling grid-charge
+    (GridChargeEn) or charge periods can make the inverter curtail your solar
+    output via its export management. Use charge periods deliberately.
   fields:
     periods:
       name: Periods
@@ -13,20 +16,18 @@ set_tou_schedule:
         ChargeOrDis (1=charge, 2=discharge), SOC (target %, 0-100),
         RunPower (% 0-100), GridChargeEn (bool), SellGridEn (bool).
       example: |
-        - StartTime: "00:00"
-          EndTime: "07:00"
+        - StartTime: "23:00"
+          EndTime: "23:59"
           ChargeOrDis: 1
           SOC: 100
           RunPower: 100
-          GridChargeEn: true
+          GridChargeEn: false
           SellGridEn: false
         - StartTime: "16:00"
           EndTime: "21:00"
           ChargeOrDis: 2
           SOC: 20
           RunPower: 100
-          GridChargeEn: false
-          SellGridEn: false
       selector:
         object:
     reserved_soc:
@@ -44,62 +45,3 @@ set_tou_schedule:
       required: false
       selector:
         text:
-
-force_charge:
-  name: Force charge now
-  description: >
-    Immediately charge the battery by writing a single TOU charge window from now
-    until 'until'. NOTE: this replaces the current TOU schedule until you set it
-    again (e.g. with set_tou_schedule).
-  fields:
-    soc:
-      name: Target SOC
-      description: Charge up to this battery SOC (%). Default 100.
-      required: false
-      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
-    power:
-      name: Power
-      description: Charge power (% of max). Default 100.
-      required: false
-      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
-    grid_charge:
-      name: Charge from grid
-      description: Allow charging from the grid (not just excess solar). Default true.
-      required: false
-      selector: {boolean: }
-    until:
-      name: Until
-      description: End time "HH:MM" (same day). Default "23:59".
-      required: false
-      selector: {text: }
-    entry_id:
-      name: Config entry ID
-      required: false
-      selector: {text: }
-
-force_discharge:
-  name: Force discharge now
-  description: >
-    Immediately discharge the battery by writing a single TOU discharge window from
-    now until 'until'. NOTE: this replaces the current TOU schedule until you set it
-    again (e.g. with set_tou_schedule).
-  fields:
-    soc:
-      name: Floor SOC
-      description: Discharge down to this battery SOC (%). Default 10.
-      required: false
-      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
-    power:
-      name: Power
-      description: Discharge power (% of max). Default 100.
-      required: false
-      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
-    until:
-      name: Until
-      description: End time "HH:MM" (same day). Default "23:59".
-      required: false
-      selector: {text: }
-    entry_id:
-      name: Config entry ID
-      required: false
-      selector: {text: }
