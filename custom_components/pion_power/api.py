@@ -117,6 +117,15 @@ class PionClient:
         )
         return data.get("Data") or {}
 
+    async def get_device_realdata(self, device_code: str) -> dict:
+        """Per-signal real-time data from the inverter itself (the app's accurate
+        'inverter' view). Returns {signal_id: {SignalValue, SignalName, ...}}.
+        More accurate than the station aggregate, which over-reports PV."""
+        data = await self._call(
+            "AppInterfaceServer/RealData/GetRealDataByDeviceCode", {"DeviceCode": device_code}
+        )
+        return data.get("Data") or {}
+
     async def get_workmode(self, station: str) -> dict:
         data = await self._call(
             "APPInterfaceServer/DeviceParam/GetStationWorkMode", {"StationCode": station}

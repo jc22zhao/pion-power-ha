@@ -26,6 +26,7 @@ class _Base(PionBaseEntity, SensorEntity):
     def __init__(self, coordinator, entry, definition: dict) -> None:
         super().__init__(coordinator, entry)
         self._key = definition["key"]
+        self._signal = definition.get("signal")
         self._attr_name = definition["name"]
         self._attr_unique_id = f"{entry.entry_id}_{self._key}"
         self._attr_native_unit_of_measurement = definition.get("unit")
@@ -36,10 +37,15 @@ class _Base(PionBaseEntity, SensorEntity):
 
 
 class PionSensor(_Base):
-    """A live-data value from GetRealDataByStationCode."""
+    """A live value, preferring the inverter's own signal (accurate) and
+    falling back to the station aggregate when the signal is unavailable."""
 
     @property
     def native_value(self):
+        if self._signal:
+            item = self.coordinator.data.get("device", {}).get(self._signal)
+            if isinstance(item, dict) and item.get("SignalValue") is not None:
+                return item.get("SignalValue")
         return self.coordinator.data.get("real", {}).get(self._key)
 
 

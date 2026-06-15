@@ -22,17 +22,20 @@ DEFAULT_ALLOW_WRITE = False
 SERVICE_SET_TOU = "set_tou_schedule"
 SERVICE_SET_TOU_TEMPLATE = "set_tou_template"
 
-# Real-time sensors from GetRealDataByStationCode:
-# (key, friendly name, unit, device_class, state_class)
+# Real-time sensors. Live power/SOC are read from the HAS inverter's own signals
+# (GetRealDataByDeviceCode, the app's accurate "inverter" view) via "signal";
+# the station aggregate (GetRealDataByStationCode, "key") over-reports PV, so it
+# is only a fallback. Daily charge/discharge have no device signal -> station key.
+# (key, signal id, friendly name, unit, device_class, state_class)
 SENSORS = [
-    {"key": "EsSoc", "name": "Battery SOC", "unit": "%", "device_class": "battery", "state_class": "measurement"},
-    {"key": "EsPower", "name": "Battery Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
-    {"key": "PvPower", "name": "PV Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
-    {"key": "GridPower", "name": "Grid Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
-    {"key": "LoadPower", "name": "Load Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
+    {"key": "EsSoc", "signal": "10200006", "name": "Battery SOC", "unit": "%", "device_class": "battery", "state_class": "measurement"},
+    {"key": "EsPower", "signal": "10200003", "name": "Battery Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
+    {"key": "PvPower", "signal": "10210000", "name": "PV Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
+    {"key": "GridPower", "signal": "10230000", "name": "Grid Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
+    {"key": "LoadPower", "signal": "10220000", "name": "Load Power", "unit": "kW", "device_class": "power", "state_class": "measurement"},
     {"key": "EsDailyCharge", "name": "Battery Daily Charge", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
     {"key": "EsDailyDisCharge", "name": "Battery Daily Discharge", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
-    {"key": "PvDailyElectricQuantity", "name": "PV Daily Energy", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "PvDailyElectricQuantity", "signal": "10210002", "name": "PV Daily Energy", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
 ]
 
 # Daily-energy sensors from GetHomeData (today's totals). Each value is obj["Value"].

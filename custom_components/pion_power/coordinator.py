@@ -55,7 +55,7 @@ class PionCoordinator(DataUpdateCoordinator):
         self._reclaim = True
 
     def _keep(self) -> dict:
-        return self.data or {"real": {}, "workmode": {}, "home": {}, "template": {}}
+        return self.data or {"real": {}, "device": {}, "workmode": {}, "home": {}, "template": {}}
 
     # ------------------------------------------------------------------ #
     # Schedule editor draft (used by the per-period editor entities)
@@ -144,6 +144,9 @@ class PionCoordinator(DataUpdateCoordinator):
                 await self.client.login()
                 self._reclaim = False
             real = await self.client.get_realdata(self.station)
+            device = {}
+            if self.device_code:
+                device = await self.client.get_device_realdata(self.device_code)
             workmode = await self.client.get_workmode(self.station)
             template = await self._fetch_active_template()
             home = {}
@@ -163,4 +166,4 @@ class PionCoordinator(DataUpdateCoordinator):
             raise ConfigEntryAuthFailed(str(err)) from err
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Error communicating with Pion API: {err}") from err
-        return {"real": real, "workmode": workmode, "home": home, "template": template}
+        return {"real": real, "device": device, "workmode": workmode, "home": home, "template": template}

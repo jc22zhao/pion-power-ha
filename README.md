@@ -105,6 +105,10 @@ password), Home Assistant prompts you to re-authenticate automatically.
   `EmsMode 7` = Time-of-Use.) Map the mode numbers by switching modes in the Pion app and watching
   the Work Mode value.
 - Power units are labelled kW / kWh — verify against your app and adjust `const.py` if needed.
+- **Data source:** live power/SOC come from the **inverter's own signals**
+  (`GetRealDataByDeviceCode` — the app's "inverter" view), which are accurate. The
+  station aggregate (`GetRealDataByStationCode`, the app's "energy station" view)
+  can over-report PV, so it's only used as a fallback and for daily charge/discharge.
 
 ## Background
 
