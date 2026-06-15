@@ -1,6 +1,7 @@
 """Config flow for Pion Power (Hoymiles HAS)."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
@@ -60,6 +61,73 @@ class PionConfigFlow(ConfigFlow, domain=DOMAIN):
             {vol.Required(CONF_EMAIL): str, vol.Required(CONF_PASSWORD): str}
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def _validate_login(self, email: str, password: str) -> str | None:
+        """Try to log in. Returns an error key, or None on success."""
+        session = async_get_clientsession(self.hass)
+        client = PionClient(session, email, password)
+        try:
+            await client.login()
+        except PionAuthError:
+            return "invalid_auth"
+        except Exception:  # noqa: BLE001
+            return "cannot_connect"
+        return None
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Update the email/password on the existing entry (keeps station + entities)."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            error = await self._validate_login(
+                user_input[CONF_EMAIL], user_input[CONF_PASSWORD]
+            )
+            if error:
+                errors["base"] = error
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={
+                        CONF_EMAIL: user_input[CONF_EMAIL],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
+                )
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_EMAIL, default=entry.data.get(CONF_EMAIL)): str,
+                vol.Required(CONF_PASSWORD): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=schema, errors=errors
+        )
+
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        """Triggered when the API rejects our login (e.g. password changed)."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            email = entry.data[CONF_EMAIL]
+            error = await self._validate_login(email, user_input[CONF_PASSWORD])
+            if error:
+                errors["base"] = error
+            else:
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]}
+                )
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            errors=errors,
+            description_placeholders={"email": self._get_reauth_entry().data.get(CONF_EMAIL)},
+        )
 
     async def async_step_station(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:

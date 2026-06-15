@@ -7,10 +7,11 @@ from copy import deepcopy
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import PionApiError, PionClient, PionKicked
+from .api import PionApiError, PionAuthError, PionClient, PionKicked
 from .const import DOMAIN
 from .schedule import apply_periods_to_template, blank_period, primary_periods
 
@@ -157,6 +158,9 @@ class PionCoordinator(DataUpdateCoordinator):
                 self.retry_interval,
             )
             return self._keep()
+        except PionAuthError as err:
+            # Credentials no longer valid (e.g. password changed) -> prompt reauth.
+            raise ConfigEntryAuthFailed(str(err)) from err
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Error communicating with Pion API: {err}") from err
         return {"real": real, "workmode": workmode, "home": home, "template": template}

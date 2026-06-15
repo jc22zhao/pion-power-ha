@@ -80,6 +80,10 @@ controls to push to the inverter. Until then the integration is read-only.
 Manual install: copy `custom_components/pion_power/` into your HA `config/custom_components/` and
 restart.
 
+**Changing your login later:** open the entry's ⋮ menu → **Reconfigure** to update the email/password
+in place (entities and history are kept). If the server ever rejects the login (e.g. you changed the
+password), Home Assistant prompts you to re-authenticate automatically.
+
 ## How it works / good to know
 
 - Talks to `https://evcharger.pionpower.ca/hems/` with the same token-header auth the app uses

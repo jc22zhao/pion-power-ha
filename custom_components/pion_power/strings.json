@@ -14,6 +14,21 @@
         "data": {
           "station_code": "Station"
         }
+      },
+      "reconfigure": {
+        "title": "Update Pion Power credentials",
+        "description": "Enter the email/password to use for this station. Your entities and history are kept.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Pion Power",
+        "description": "The login for {email} was rejected. Enter the current password.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -22,7 +37,9 @@
       "no_stations": "No stations were found for this account."
     },
     "abort": {
-      "already_configured": "This station is already configured."
+      "already_configured": "This station is already configured.",
+      "reconfigure_successful": "Credentials updated.",
+      "reauth_successful": "Re-authenticated successfully."
     }
   },
   "options": {
