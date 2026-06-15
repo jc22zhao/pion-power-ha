@@ -80,6 +80,14 @@ controls to push to the inverter. Until then the integration is read-only.
 Manual install: copy `custom_components/pion_power/` into your HA `config/custom_components/` and
 restart.
 
+> 💡 **Highly recommended: use a dedicated app user for Home Assistant.** The Pion cloud allows only
+> one active session per user, so if Home Assistant logs in with *your* account it will keep kicking
+> your phone out of the Pion app (and vice-versa). Instead, in the Pion Power app create a **separate
+> user** and **add that user to your home/station**, then give Home Assistant *that* user's login.
+> With its own session, the integration and your personal app login can both stay connected and read
+> the data at the same time — no tug-of-war. (The integration also has a built-in coexistence
+> fallback for the single-session case, but a dedicated user avoids the conflict entirely.)
+
 **Changing your login later:** open the entry's ⋮ menu → **Reconfigure** to update the email/password
 in place (entities and history are kept). If the server ever rejects the login (e.g. you changed the
 password), Home Assistant prompts you to re-authenticate automatically.
