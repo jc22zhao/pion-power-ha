@@ -5,6 +5,10 @@ BASE_URL = "https://evcharger.pionpower.ca/hems/"
 COMPANY_CODE = "PionPower"
 DEFAULT_SCAN_INTERVAL = 30
 
+# When the mobile app takes the single-session account, HA backs off this long
+# before reclaiming it, so you can use the app without an immediate fight.
+BACKOFF_SECONDS = 600
+
 CONF_EMAIL = "email"
 CONF_STATION_CODE = "station_code"
 CONF_SCAN_INTERVAL = "scan_interval"
