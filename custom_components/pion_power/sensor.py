@@ -17,6 +17,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [PionSensor(coordinator, entry, d) for d in SENSORS]
     if coordinator.device_code:
         entities += [PionHomeSensor(coordinator, entry, d) for d in HOME_SENSORS]
+    entities.append(PionTouScheduleSensor(coordinator, entry))
     async_add_entities(entities)
 
 
@@ -53,3 +54,56 @@ class PionHomeSensor(_Base):
             return float(item)
         except (TypeError, ValueError):
             return None
+
+
+def _humanize_period(p: dict) -> str:
+    """One-line summary of a TOU period for display."""
+    action = {1: "charge", 2: "discharge"}.get(p.get("ChargeOrDis"), "?")
+    parts = [
+        f"{p.get('StartTime', '?')}-{p.get('EndTime', '?')}",
+        f"{action} to {p.get('SOC', '?')}%",
+        f"@{p.get('RunPower', '?')}% power",
+    ]
+    if p.get("GridChargeEn"):
+        parts.append("grid-charge ON")
+    if p.get("SellGridEn"):
+        parts.append("sell-to-grid ON")
+    return "  ".join(parts)
+
+
+class PionTouScheduleSensor(PionBaseEntity, SensorEntity):
+    """Surfaces the server-side Time-of-Use schedule.
+
+    State = number of configured TOU periods. Attributes hold the full schedule
+    (raw + humanized), the reserved SOC, and whether TOU mode is currently active
+    (EmsMode 7). Modify it with the `pion_power.set_tou_schedule` service.
+    """
+
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_name = "TOU Schedule"
+        self._attr_unique_id = f"{entry.entry_id}_tou_schedule"
+
+    @property
+    def _periods(self) -> list[dict]:
+        wm = self.coordinator.data.get("workmode", {}) or {}
+        periods = wm.get("TOUModeStraPeriods")
+        return periods if isinstance(periods, list) else []
+
+    @property
+    def native_value(self):
+        return len(self._periods)
+
+    @property
+    def extra_state_attributes(self):
+        wm = self.coordinator.data.get("workmode", {}) or {}
+        periods = self._periods
+        return {
+            "tou_mode_active": str(wm.get("EmsMode")) == "7",
+            "ems_mode": wm.get("EmsMode"),
+            "reserved_soc": wm.get("TOUModeReservedSoc"),
+            "summary": [_humanize_period(p) for p in periods],
+            "periods": periods,
+        }

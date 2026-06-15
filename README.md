@@ -23,6 +23,10 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 - Battery / PV / Grid / Load power (kW)
 - Battery daily charge & discharge, PV daily energy (kWh)
 - HEMS online status
+- **TOU Schedule** — state is the number of configured Time-of-Use periods; its
+  attributes hold the full server-side schedule (`periods`, a humanized `summary`,
+  `reserved_soc`, `ems_mode`, and `tou_mode_active`). This is the read side of the
+  schedule; write it with the `set_tou_schedule` service below.
 
 **Controls** (number entities — read-modify-write on the inverter's work mode)
 - Work Mode (raw `EmsMode`)
@@ -32,6 +36,13 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 
 Set the relevant parameters plus the matching **Work Mode** to, e.g., force-charge the battery
 during cheap grid hours, then return to self-consumption.
+
+**Services**
+- `pion_power.set_tou_schedule` — write the Time-of-Use schedule server-side (persists on the
+  inverter, followed even if HA is offline). Pass a `periods` list (each with `StartTime`,
+  `EndTime`, `ChargeOrDis` 1=charge/2=discharge, `SOC`, `RunPower`, `GridChargeEn`, `SellGridEn`)
+  and optional `reserved_soc`. View the current schedule on the **TOU Schedule** sensor, edit, and
+  call this to write it back — directly, from a dashboard button, or from an automation.
 
 ## Installation (via HACS)
 
