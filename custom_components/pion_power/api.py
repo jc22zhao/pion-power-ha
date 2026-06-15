@@ -153,3 +153,15 @@ class PionClient:
         res = await self._call("APPInterfaceServer/DeviceParam/SetStationWorkMode", payload)
         if str(res.get("Code")) != "1":
             raise PionApiError(res.get("Msg", "set TOU schedule failed"))
+
+    async def get_devices(self, station: str) -> list[dict]:
+        data = await self._call("AppInterfaceServer/Config/GetDeviceList", {"StationCode": station})
+        return data.get("Data") or []
+
+    async def get_home_data(self, device_code: str, date: str) -> dict:
+        """Today's daily-energy breakdown (FromGrid, ToGrid, StationUse, ...)."""
+        data = await self._call(
+            "APPInterfaceServer/AppStatistics/GetHomeData",
+            {"deviceCode": device_code, "timeType": "1", "searchTime": date},
+        )
+        return data.get("Data") or {}

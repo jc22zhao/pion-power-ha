@@ -15,6 +15,8 @@ CONF_SCAN_INTERVAL = "scan_interval"
 CONF_RETRY_INTERVAL = "retry_interval"
 
 SERVICE_SET_TOU = "set_tou_schedule"
+SERVICE_FORCE_CHARGE = "force_charge"
+SERVICE_FORCE_DISCHARGE = "force_discharge"
 
 # Real-time sensors from GetRealDataByStationCode:
 # (key, friendly name, unit, device_class, state_class)
@@ -27,6 +29,15 @@ SENSORS = [
     {"key": "EsDailyCharge", "name": "Battery Daily Charge", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
     {"key": "EsDailyDisCharge", "name": "Battery Daily Discharge", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
     {"key": "PvDailyElectricQuantity", "name": "PV Daily Energy", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+]
+
+# Daily-energy sensors from GetHomeData (today's totals). Each value is obj["Value"].
+HOME_SENSORS = [
+    {"key": "FromGrid", "name": "Grid Import Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "ToGrid", "name": "Grid Export Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "StationUse", "name": "Home Consumption Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "FromSolar", "name": "Solar to Home Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "FromBattery", "name": "Battery to Home Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
 ]
 
 # Writable work-mode fields (number entities). Read-modify-write on SetStationWorkMode.

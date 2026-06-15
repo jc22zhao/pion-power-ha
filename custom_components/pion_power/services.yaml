@@ -44,3 +44,62 @@ set_tou_schedule:
       required: false
       selector:
         text:
+
+force_charge:
+  name: Force charge now
+  description: >
+    Immediately charge the battery by writing a single TOU charge window from now
+    until 'until'. NOTE: this replaces the current TOU schedule until you set it
+    again (e.g. with set_tou_schedule).
+  fields:
+    soc:
+      name: Target SOC
+      description: Charge up to this battery SOC (%). Default 100.
+      required: false
+      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
+    power:
+      name: Power
+      description: Charge power (% of max). Default 100.
+      required: false
+      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
+    grid_charge:
+      name: Charge from grid
+      description: Allow charging from the grid (not just excess solar). Default true.
+      required: false
+      selector: {boolean: }
+    until:
+      name: Until
+      description: End time "HH:MM" (same day). Default "23:59".
+      required: false
+      selector: {text: }
+    entry_id:
+      name: Config entry ID
+      required: false
+      selector: {text: }
+
+force_discharge:
+  name: Force discharge now
+  description: >
+    Immediately discharge the battery by writing a single TOU discharge window from
+    now until 'until'. NOTE: this replaces the current TOU schedule until you set it
+    again (e.g. with set_tou_schedule).
+  fields:
+    soc:
+      name: Floor SOC
+      description: Discharge down to this battery SOC (%). Default 10.
+      required: false
+      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
+    power:
+      name: Power
+      description: Discharge power (% of max). Default 100.
+      required: false
+      selector: {number: {min: 0, max: 100, unit_of_measurement: "%"}}
+    until:
+      name: Until
+      description: End time "HH:MM" (same day). Default "23:59".
+      required: false
+      selector: {text: }
+    entry_id:
+      name: Config entry ID
+      required: false
+      selector: {text: }
