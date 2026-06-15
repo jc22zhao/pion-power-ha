@@ -10,10 +10,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONTROLS, DOMAIN
 from .entity import PionBaseEntity, PionPeriodEntity, setup_period_entities
 
-# Per-period numeric fields: (draft key, name, unit).
+# Per-period numeric fields: (draft key, name, unit). Number-prefixed for order.
 PERIOD_NUMBERS = [
-    ("SOC", "Target SOC", "%"),
-    ("RunPower", "Run Power", "%"),
+    ("SOC", "4 Target SOC", "%"),
+    ("RunPower", "5 Run Power", "%"),
 ]
 
 

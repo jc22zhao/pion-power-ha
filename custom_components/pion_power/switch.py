@@ -9,10 +9,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .entity import PionBaseEntity, PionPeriodEntity, setup_period_entities
 
-# Per-period boolean fields: (draft key, name, icon).
+# Per-period boolean fields: (draft key, name, icon). Number-prefixed for order.
 PERIOD_SWITCHES = [
-    ("GridChargeEn", "Grid Charge", "mdi:transmission-tower-import"),
-    ("SellGridEn", "Sell to Grid", "mdi:transmission-tower-export"),
+    ("GridChargeEn", "6 Grid Charge", "mdi:transmission-tower-import"),
+    ("SellGridEn", "7 Sell to Grid", "mdi:transmission-tower-export"),
 ]
 
 

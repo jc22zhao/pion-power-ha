@@ -28,7 +28,7 @@ async def async_setup_entry(
 class PionPeriodModeSelect(PionPeriodEntity, SelectEntity):
     """Charge/discharge mode of one TOU period."""
 
-    _attr_name = "Mode"
+    _attr_name = "3 Mode"
     _attr_icon = "mdi:battery-charging-medium"
     _attr_options = list(MODE_TO_CODE)
 

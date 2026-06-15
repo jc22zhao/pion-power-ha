@@ -11,10 +11,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .entity import PionPeriodEntity, setup_period_entities
 
-# (draft key, name)
+# (draft key, name). Names are number-prefixed so the device page (which sorts
+# entities alphabetically by name) shows them in logical order.
 PERIOD_TIMES = [
-    ("StartTime", "Start"),
-    ("EndTime", "End"),
+    ("StartTime", "1 Start"),
+    ("EndTime", "2 End"),
 ]
 
 
