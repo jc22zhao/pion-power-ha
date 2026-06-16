@@ -15,6 +15,12 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 > solar output (sometimes to 0%) via its export management, and the curtailment can latch. Prefer
 > normal TOU scheduling and avoid forcing grid-charge unless you understand this interaction.
 > (Earlier `force_charge`/`force_discharge` services were removed in 0.5.0 for this reason.)
+>
+> ℹ️ **Single-inverter setups.** This integration is currently built and tested for a system with
+> **one storage inverter** (one HAS). It reads that inverter's signals directly; on a multi-inverter
+> site it would only surface the first inverter. Multi-inverter support (per-inverter sub-devices +
+> aggregate) isn't implemented yet — if you have such a system, open an issue with your
+> `GetDeviceList` / `GetRealDataByDeviceCode` responses and it can be added.
 
 ## Features
 
