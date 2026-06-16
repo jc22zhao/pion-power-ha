@@ -29,56 +29,49 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 - Battery / PV / Grid / Load power (kW)
 - Battery daily charge & discharge, PV daily energy (kWh)
 - HEMS online status
-- **TOU Schedule** — reads the **active TOU template** (the full, app-editable
-  schedule via `GetTouTemplateDetail`). State is the number of periods; attributes
-  hold the `periods`, a humanized `summary`, `template_name`, `reserved_soc`,
-  `ems_mode`, and `tou_mode_active`. Note: the workmode's `TOUModeStraPeriods` is
-  only a server-compiled subset (the grid-charge windows), so the sensor reads the
-  template instead and falls back to the workmode list only if the template is
-  unavailable.
+- **TOU Schedule** — a read-only summary of the active schedule (the work-mode
+  charge windows + reserve), with the periods in its attributes.
 
-**Controls** (number entities — read-modify-write on the inverter's work mode)
-- Work Mode (raw `EmsMode`)
-- Force Charge SOC, Force Discharge SOC
-- Max Charge Power, Max Discharge Power
-- TOU Reserved SOC, Self-Use SOC, Backup SOC, Economy SOC
+**Controls**
+- **Reserve Floor SOC** (number) — the battery's discharge floor (`TOUModeReservedSoc`): the
+  inverter covers load from the battery down to this level, then leaves the rest. Raising it
+  "holds" the battery (e.g. to save it for peak); it's also the blackout-reserve lever. This is the
+  one work-mode SOC the integration exposes — the others (Self-Use / Backup / Economy / Force
+  charge-discharge) are mode-gated and unused in the charge-window model, so they aren't surfaced.
 
-Set the relevant parameters plus the matching **Work Mode** to, e.g., force-charge the battery
-during cheap grid hours, then return to self-consumption.
+**Schedule editor** — charge windows as sub-devices (no dashboards/templates needed)
 
-**Schedule editor** (built-in entities — no custom dashboards or templates needed)
+The HAS executes the **work mode** (`TOUModeStraPeriods`), so the editor reads and writes there
+directly. The schedule is just **charge windows** + the reserve floor; discharge is automatic
+(default self-consumption down to the reserve floor), so there's no discharge "period" to manage.
 
-The editor reads and writes the inverter's **work mode** (`TOUModeStraPeriods`) — the schedule the
-HAS actually executes. Each period appears as a **TOU Period N** sub-device with native entities —
-**Start**, **End** (time), **Mode** (select: Charge / Discharge), **Target SOC**, **Run Power**
-(number), **Grid Charge**, **Sell to Grid** (switch). The number of period devices tracks the
-schedule automatically.
+- Each charge window is a **Charge Window N** sub-device with **Start**, **End** (time), **Target
+  SOC** (number), and **Grid Charge** (switch). Each also has a **Delete window** button.
+- The HEMS device has an **Add charge window** button. The inverter supports **at most 2 charge
+  windows** (writing more silently drops the extras), so Add is disabled once two exist.
+- Edits **auto-apply** — change an entity and it's written to the inverter after a short debounce
+  (rapid edits coalesce into one `SetStationWorkMode`). No Apply button; changes take effect in
+  ~30–60 s, and the entities re-sync to the cloud on each poll.
 
-Edits are staged locally; the HEMS device has three buttons:
-- **Apply schedule** — write the staged periods straight to the work mode (one `SetStationWorkMode`).
-- **Reload schedule from server** — discard staged edits and re-read the work mode.
-- **Add TOU period** — append a new period (each period device also has a **Delete period** button).
-
-> **How a schedule executes.** The HAS runs the work mode, not the TOU template — so the editor
-> (and the `set_tou_schedule` service) write there directly; changes take effect within ~30–60 s.
-> The periods are **charge windows** (grid-charge on a window) and explicit discharge windows.
-> Outside any period the inverter runs default self-consumption (covers load from solar/battery)
-> down to the **reserve floor** (`TOU Reserved SOC`) — so that reserve is your discharge/"hold" lever.
-> Because the editor and `set_tou_schedule` share this one source, a manual edit and an automation
-> (e.g. a nightly autoscheduler) stay in sync — the editor reflects whatever the automation last
-> wrote, and an in-progress manual edit is held until you Apply or Reload.
+> **One source of truth.** The editor and the `set_tou_schedule` service both read/write the work
+> mode, so **manual edits and an autoscheduler automation stay in sync** — the entities reflect
+> whatever was last written (by you or an automation), and an in-progress manual edit is held until
+> the debounced write flushes. ⚠️ Don't activate a TOU **template** in the Pion app while using the
+> HA editor/automations — doing so re-compiles onto the work mode (and drops grid-charge); HA's
+> work-mode control is the single source of truth.
 
 **Writes are off by default.** Enable *Allow schedule writes* in the integration options
-(Settings → Devices & Services → Pion Power → Configure) to allow Apply and the number/work-mode
-controls to push to the inverter. Until then the integration is read-only.
+(Settings → Devices & Services → Pion Power → Configure). Until then the integration is read-only
+(edits won't be written).
 
-**Services**
-- `pion_power.set_tou_template` — write the full schedule (any shape: multiple seasonal date
-  ranges, weekday/weekend groups, any number of periods). Pass `groups` (each with an optional date
-  range, `weeks`, and `periods`). Used by automations; the per-period entities above are the
-  point-and-click equivalent.
-- `pion_power.set_tou_schedule` — coarse write of the workmode grid-charge windows (`periods` list).
-  Both services require *Allow schedule writes*.
+**Services / automations**
+- `pion_power.set_tou_schedule` — write the charge windows atomically (`periods` list, each with
+  `StartTime`, `EndTime`, `ChargeOrDis` 1=charge, `SOC`, `RunPower`, `GridChargeEn`), plus optional
+  `reserved_soc`. **Recommended for autoschedulers** (one atomic write of the whole schedule).
+- Autoschedulers can equally just **set the Charge Window entities** — the debounce coalesces those
+  into a single safe write. Either way, requires *Allow schedule writes*.
+- `pion_power.set_tou_template` — legacy template writer; the HAS doesn't execute templates, so
+  prefer `set_tou_schedule`.
 
 ## Work modes & SOC parameters
 
@@ -97,11 +90,11 @@ switching modes in the Pion app and watching the *Work Mode* value.)
 | **Economy** | Charge/discharge by the inverter's own peak/valley clock (`EconomyModeInfos`), an alternative to TOU. | **Economy SOC** — the floor during economy operation. |
 | **Force charge / discharge** | One-shot push to a target SOC. | **Force Charge SOC** — charge *up to* this % then stop. **Force Discharge SOC** — discharge *down to* this % then stop. |
 
-**Other work-mode controls:** *Max Charge Power* / *Max Discharge Power* (caps, %).
-
-> ⚠️ The earlier `force_charge` / `force_discharge` **services** were removed in 0.5.0 (they could
-> trigger solar curtailment on AC-coupled systems). The Force Charge/Discharge **SOC number
-> entities** remain as raw work-mode fields but only matter if a force mode is engaged.
+> This table is background on the inverter's modes. In practice the integration runs the inverter in
+> **Time-of-Use** mode and exposes only the **Reserve Floor SOC**; the other mode SOC parameters
+> (Self-Use / Backup / Economy / Force charge-discharge) and the raw Work Mode / Max Power fields are
+> **no longer surfaced as entities** (they're unused in the charge-window + reserve-floor model).
+> The `force_charge` / `force_discharge` services were removed in 0.5.0 (solar-curtailment risk).
 
 ## Installation (via HACS)
 

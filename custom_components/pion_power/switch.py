@@ -1,4 +1,4 @@
-"""Switch platform: manually hand the single session to the mobile app."""
+"""Switch platform: session control + per-charge-window grid-charge toggle."""
 from __future__ import annotations
 
 from homeassistant.components.switch import SwitchEntity
@@ -7,13 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .entity import PionBaseEntity, PionPeriodEntity, setup_period_entities
-
-# Per-period boolean fields: (draft key, name, icon). Number-prefixed for order.
-PERIOD_SWITCHES = [
-    ("GridChargeEn", "6 Grid Charge", "mdi:transmission-tower-import"),
-    ("SellGridEn", "7 Sell to Grid", "mdi:transmission-tower-export"),
-]
+from .entity import PionBaseEntity, PionWindowEntity, setup_window_entities
 
 
 async def async_setup_entry(
@@ -23,12 +17,9 @@ async def async_setup_entry(
     async_add_entities([PionCloudConnectionSwitch(coordinator, entry)])
 
     def _factory(coord, ent, index):
-        return [
-            PionPeriodSwitch(coord, ent, index, key, name, icon)
-            for key, name, icon in PERIOD_SWITCHES
-        ]
+        return [PionWindowGridChargeSwitch(coord, ent, index)]
 
-    setup_period_entities(coordinator, entry, async_add_entities, _factory)
+    setup_window_entities(coordinator, entry, async_add_entities, _factory)
 
 
 class PionCloudConnectionSwitch(PionBaseEntity, SwitchEntity):
@@ -61,23 +52,23 @@ class PionCloudConnectionSwitch(PionBaseEntity, SwitchEntity):
         self.async_write_ha_state()
 
 
-class PionPeriodSwitch(PionPeriodEntity, SwitchEntity):
-    """A boolean field of one TOU period (edits the draft; commit via Apply)."""
+class PionWindowGridChargeSwitch(PionWindowEntity, SwitchEntity):
+    """Whether one charge window charges from the grid (vs solar only)."""
 
-    def __init__(self, coordinator, entry, index, key, name, icon) -> None:
+    _attr_name = "Grid Charge"
+    _attr_icon = "mdi:transmission-tower-import"
+
+    def __init__(self, coordinator, entry, index) -> None:
         super().__init__(coordinator, entry, index)
-        self._field = key
-        self._attr_name = name
-        self._attr_icon = icon
-        self._attr_unique_id = f"{entry.entry_id}_period_{index}_{key}"
+        self._attr_unique_id = f"{entry.entry_id}_window_{index}_gridcharge"
 
     @property
     def is_on(self) -> bool | None:
-        period = self._period
-        return None if period is None else bool(period.get(self._field))
+        window = self._window
+        return None if window is None else bool(window.get("GridChargeEn"))
 
     async def async_turn_on(self, **kwargs) -> None:
-        self.coordinator.edit_period(self._index, self._field, True)
+        self.coordinator.edit_window(self._index, "GridChargeEn", True)
 
     async def async_turn_off(self, **kwargs) -> None:
-        self.coordinator.edit_period(self._index, self._field, False)
+        self.coordinator.edit_window(self._index, "GridChargeEn", False)

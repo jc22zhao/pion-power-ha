@@ -1,4 +1,4 @@
-"""Time platform: start/end of each TOU period (edits the draft)."""
+"""Time platform: start/end of each charge window (debounced auto-write)."""
 from __future__ import annotations
 
 from datetime import time as dt_time
@@ -9,13 +9,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .entity import PionPeriodEntity, setup_period_entities
+from .entity import PionWindowEntity, setup_window_entities
 
-# (draft key, name). Names are number-prefixed so the device page (which sorts
-# entities alphabetically by name) shows them in logical order.
-PERIOD_TIMES = [
-    ("StartTime", "1 Start"),
-    ("EndTime", "2 End"),
+# (draft key, name)
+WINDOW_TIMES = [
+    ("StartTime", "Start"),
+    ("EndTime", "End"),
 ]
 
 
@@ -25,9 +24,9 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
     def _factory(coord, ent, index):
-        return [PionPeriodTime(coord, ent, index, key, name) for key, name in PERIOD_TIMES]
+        return [PionWindowTime(coord, ent, index, key, name) for key, name in WINDOW_TIMES]
 
-    setup_period_entities(coordinator, entry, async_add_entities, _factory)
+    setup_window_entities(coordinator, entry, async_add_entities, _factory)
 
 
 def _parse_hhmm(value) -> dt_time | None:
@@ -40,21 +39,21 @@ def _parse_hhmm(value) -> dt_time | None:
         return None
 
 
-class PionPeriodTime(PionPeriodEntity, TimeEntity):
-    """Start/End time of one TOU period. "24:00" is shown as 00:00."""
+class PionWindowTime(PionWindowEntity, TimeEntity):
+    """Start/End time of one charge window."""
 
     def __init__(self, coordinator, entry, index, key, name) -> None:
         super().__init__(coordinator, entry, index)
         self._field = key
         self._attr_name = name
-        self._attr_unique_id = f"{entry.entry_id}_period_{index}_{key}"
+        self._attr_unique_id = f"{entry.entry_id}_window_{index}_{key}"
 
     @property
     def native_value(self) -> dt_time | None:
-        period = self._period
-        return None if period is None else _parse_hhmm(period.get(self._field))
+        window = self._window
+        return None if window is None else _parse_hhmm(window.get(self._field))
 
     async def async_set_value(self, value: dt_time) -> None:
-        self.coordinator.edit_period(
+        self.coordinator.edit_window(
             self._index, self._field, f"{value.hour:02d}:{value.minute:02d}"
         )

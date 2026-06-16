@@ -47,16 +47,16 @@ HOME_SENSORS = [
     {"key": "FromBattery", "name": "Battery to Home Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
 ]
 
-# Writable work-mode fields (number entities). Read-modify-write on SetStationWorkMode.
-# NOTE: parameters are mode-gated by EmsMode, and changes apply asynchronously (~8s).
+# The only work-mode number we expose: the reserve floor (discharge floor /
+# "hold" lever). The other work-mode SOC/power fields are mode-gated and unused
+# in this charge-window + reserve-floor model, so they are not surfaced.
 CONTROLS = [
-    {"field": "EmsMode", "name": "Work Mode (raw EmsMode)", "min": 1, "max": 8, "step": 1, "unit": None},
-    {"field": "ForceChargeSOC", "name": "Force Charge SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "ForceDisargeSOC", "name": "Force Discharge SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "MaximumChargePower", "name": "Max Charge Power", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "MaximumDischargePower", "name": "Max Discharge Power", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "TOUModeReservedSoc", "name": "TOU Reserved SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "SelfUsedSOC", "name": "Self-Use SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "BackUpSOC", "name": "Backup SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
-    {"field": "EconomicModeSOC", "name": "Economy SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
+    {"field": "TOUModeReservedSoc", "name": "Reserve Floor SOC", "min": 0, "max": 100, "step": 1, "unit": "%"},
 ]
+
+# Inverter caps the work-mode TOU schedule at this many charge windows (verified:
+# writing more returns success but only 2 persist).
+MAX_CHARGE_WINDOWS = 2
+
+# Debounce (seconds) for coalescing rapid entity edits into one work-mode write.
+WRITE_DEBOUNCE = 3

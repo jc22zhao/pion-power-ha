@@ -1,4 +1,4 @@
-"""Number platform: work-mode controls + per-period schedule fields."""
+"""Number platform: reserve floor (hub) + per-charge-window target SOC."""
 from __future__ import annotations
 
 from homeassistant.components.number import NumberEntity, NumberMode
@@ -8,36 +8,25 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONTROLS, DOMAIN
-from .entity import PionBaseEntity, PionPeriodEntity, setup_period_entities
-
-# Per-period numeric fields: (draft key, name, unit). Number-prefixed for order.
-PERIOD_NUMBERS = [
-    ("SOC", "4 Target SOC", "%"),
-    ("RunPower", "5 Run Power", "%"),
-]
+from .entity import PionBaseEntity, PionWindowEntity, setup_window_entities
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    # Hub-level work-mode number(s): just the reserve floor.
     async_add_entities(PionNumber(coordinator, entry, definition) for definition in CONTROLS)
 
     def _factory(coord, ent, index):
-        return [
-            PionPeriodNumber(coord, ent, index, key, name, unit)
-            for key, name, unit in PERIOD_NUMBERS
-        ]
+        return [PionWindowSocNumber(coord, ent, index)]
 
-    setup_period_entities(coordinator, entry, async_add_entities, _factory)
+    setup_window_entities(coordinator, entry, async_add_entities, _factory)
 
 
 class PionNumber(PionBaseEntity, NumberEntity):
-    """A writable work-mode parameter.
-
-    NOTE: parameters are mode-gated by EmsMode and apply asynchronously (~8s);
-    the value refreshes on the next coordinator poll.
-    """
+    """A writable work-mode field (the reserve floor). Applies asynchronously
+    (~8s); refreshes on the next poll."""
 
     _attr_mode = NumberMode.BOX
 
@@ -69,29 +58,27 @@ class PionNumber(PionBaseEntity, NumberEntity):
         await self.coordinator.async_request_refresh()
 
 
-class PionPeriodNumber(PionPeriodEntity, NumberEntity):
-    """A numeric field of one TOU period (edits the draft; commit via Apply)."""
+class PionWindowSocNumber(PionWindowEntity, NumberEntity):
+    """Target charge SOC for one charge window (debounced auto-write)."""
 
     _attr_mode = NumberMode.BOX
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
     _attr_native_unit_of_measurement = "%"
+    _attr_name = "Target SOC"
 
-    def __init__(self, coordinator, entry, index, key, name, unit) -> None:
+    def __init__(self, coordinator, entry, index) -> None:
         super().__init__(coordinator, entry, index)
-        self._field = key
-        self._attr_name = name
-        self._attr_unique_id = f"{entry.entry_id}_period_{index}_{key}"
-        self._attr_native_unit_of_measurement = unit
+        self._attr_unique_id = f"{entry.entry_id}_window_{index}_soc"
 
     @property
     def native_value(self) -> float | None:
-        period = self._period
-        if period is None:
+        window = self._window
+        if window is None:
             return None
-        val = period.get(self._field)
+        val = window.get("SOC")
         return None if val is None else float(val)
 
     async def async_set_native_value(self, value: float) -> None:
-        self.coordinator.edit_period(self._index, self._field, int(value))
+        self.coordinator.edit_window(self._index, "SOC", int(value))

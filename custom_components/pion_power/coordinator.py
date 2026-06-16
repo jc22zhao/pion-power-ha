@@ -6,13 +6,14 @@ import time
 from copy import deepcopy
 from datetime import timedelta
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .api import PionApiError, PionAuthError, PionClient, PionKicked
-from .const import DOMAIN
+from .const import DOMAIN, MAX_CHARGE_WINDOWS, WRITE_DEBOUNCE
 from .schedule import blank_period, draft_to_workmode, workmode_draft
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,10 +42,11 @@ class PionCoordinator(DataUpdateCoordinator):
         self.paused = False
         self._yield_until = 0.0
         self._reclaim = False
-        # Staging buffer for the per-period editor entities. None => track the
-        # server. Once edited, `_draft_dirty` holds it until Apply or Reload.
-        self._draft: list[dict] | None = None
-        self._draft_dirty = False
+        # Charge-window editor model. `_windows` mirrors the work-mode charge
+        # windows; edits mutate it and schedule a single debounced write.
+        self._windows: list[dict] | None = None
+        self._windows_pending = False
+        self._write_unsub = None
 
     def pause(self) -> None:
         self.paused = True
@@ -58,63 +60,63 @@ class PionCoordinator(DataUpdateCoordinator):
         return self.data or {"real": {}, "device": {}, "workmode": {}, "home": {}, "template": {}}
 
     # ------------------------------------------------------------------ #
-    # Schedule editor draft (used by the per-period editor entities)
+    # Charge-window editor (work-mode TOUModeStraPeriods, debounced auto-write)
     # ------------------------------------------------------------------ #
-    @property
-    def draft_dirty(self) -> bool:
-        return self._draft_dirty
-
     def _workmode(self) -> dict:
         return (self.data or {}).get("workmode", {}) or {}
 
-    def get_draft(self) -> list[dict]:
-        """Editable period list from the inverter WORKMODE (the executing
-        schedule). Tracks the server until the user edits, then holds the draft
-        until Apply/Reload — so an autoscheduler writing the workmode is picked
-        up automatically while not clobbering an in-progress manual edit."""
-        if self._draft is None or not self._draft_dirty:
-            self._draft = workmode_draft(self._workmode())
-        return self._draft
+    def get_windows(self) -> list[dict]:
+        """Charge windows from the work mode. Tracks the cloud until the user (or
+        an automation) edits a window, then holds the local copy until the
+        debounced write flushes — so polls don't clobber an in-progress edit."""
+        if self._windows is None or not self._windows_pending:
+            self._windows = workmode_draft(self._workmode())[:MAX_CHARGE_WINDOWS]
+        return self._windows
 
-    def _touch(self) -> None:
-        self._draft_dirty = True
+    @callback
+    def _schedule_write(self) -> None:
+        self._windows_pending = True
         self.async_update_listeners()
+        if self._write_unsub:
+            self._write_unsub()
+        self._write_unsub = async_call_later(self.hass, WRITE_DEBOUNCE, self._flush_windows)
 
-    def edit_period(self, index: int, field: str, value) -> None:
-        draft = self.get_draft()
-        if 0 <= index < len(draft):
-            draft[index][field] = value
-            self._touch()
-
-    def add_period(self) -> None:
-        self.get_draft().append(blank_period())
-        self._touch()
-
-    def delete_period(self, index: int) -> None:
-        draft = self.get_draft()
-        if 0 <= index < len(draft):
-            draft.pop(index)
-            self._touch()
-
-    def reload_draft(self) -> None:
-        self._draft = None
-        self._draft_dirty = False
-        self.async_update_listeners()
-
-    async def apply_draft(self) -> None:
-        """Write the staged schedule straight to the inverter WORKMODE (what it
-        executes) via SetStationWorkMode."""
+    async def _flush_windows(self, _now=None) -> None:
+        self._write_unsub = None
+        windows = self._windows or []
         if not self.allow_write:
-            raise PionApiError(
-                "Schedule writing is disabled. Enable 'Allow schedule writes' in "
-                "the Pion Power integration options once your system is healthy."
+            _LOGGER.warning(
+                "Charge-window edit not written: 'Allow schedule writes' is off"
             )
-        await self.client.set_tou_schedule(
-            self.station, draft_to_workmode(self.get_draft()), ensure_tou_mode=True
-        )
-        self._draft = None
-        self._draft_dirty = False
+        else:
+            try:
+                await self.client.set_tou_schedule(
+                    self.station, draft_to_workmode(windows), ensure_tou_mode=True
+                )
+            except PionApiError as err:
+                _LOGGER.error("Pion charge-window write failed: %s", err)
+        self._windows_pending = False
         await self.async_request_refresh()
+
+    def edit_window(self, index: int, field: str, value) -> None:
+        windows = self.get_windows()
+        if 0 <= index < len(windows):
+            windows[index][field] = value
+            self._schedule_write()
+
+    def add_window(self) -> None:
+        windows = self.get_windows()
+        if len(windows) >= MAX_CHARGE_WINDOWS:
+            _LOGGER.warning("Inverter supports at most %s charge windows", MAX_CHARGE_WINDOWS)
+            return
+        windows.append(blank_period())
+        self._schedule_write()
+
+    def delete_window(self, index: int) -> None:
+        windows = self.get_windows()
+        if 0 <= index < len(windows):
+            windows.pop(index)
+            self._schedule_write()
 
     async def _fetch_active_template(self) -> dict:
         """Best-effort: the active TOU template's full detail (the real schedule).

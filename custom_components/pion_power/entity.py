@@ -30,8 +30,8 @@ class PionBaseEntity(CoordinatorEntity[PionCoordinator]):
         )
 
 
-class PionPeriodEntity(CoordinatorEntity[PionCoordinator]):
-    """Base for an entity that edits one TOU period (its own sub-device)."""
+class PionWindowEntity(CoordinatorEntity[PionCoordinator]):
+    """Base for an entity that edits one charge window (its own sub-device)."""
 
     _attr_has_entity_name = True
 
@@ -40,38 +40,38 @@ class PionPeriodEntity(CoordinatorEntity[PionCoordinator]):
         self._entry = entry
         self._index = index
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry.entry_id}_period_{index}")},
-            name=f"TOU Period {index + 1}",
+            identifiers={(DOMAIN, f"{entry.entry_id}_window_{index}")},
+            name=f"Charge Window {index + 1}",
             manufacturer="Pion Power / Hoymiles",
-            model="TOU period",
+            model="Charge window",
             via_device=(DOMAIN, entry.entry_id),
         )
 
     @property
-    def _period(self) -> dict | None:
-        draft = self.coordinator.get_draft()
-        return draft[self._index] if 0 <= self._index < len(draft) else None
+    def _window(self) -> dict | None:
+        windows = self.coordinator.get_windows()
+        return windows[self._index] if 0 <= self._index < len(windows) else None
 
     @property
     def available(self) -> bool:
-        return super().available and self._period is not None
+        return super().available and self._window is not None
 
 
-def setup_period_entities(
+def setup_window_entities(
     coordinator: PionCoordinator,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
     factory: Callable[[PionCoordinator, ConfigEntry, int], list[Entity]],
 ) -> None:
-    """Create per-period entities to match the current draft length, adding more
-    as the draft grows (dynamic count). Entities for removed periods stay
-    registered but report unavailable."""
+    """Create per-window entities to match the current charge-window count,
+    adding more as windows are added (dynamic). Entities for removed windows
+    stay registered but report unavailable."""
     created: set[int] = set()
 
     @callback
     def _sync() -> None:
         new: list[Entity] = []
-        for i in range(len(coordinator.get_draft())):
+        for i in range(len(coordinator.get_windows())):
             if i not in created:
                 created.add(i)
                 new.extend(factory(coordinator, entry, i))
