@@ -68,6 +68,29 @@ controls to push to the inverter. Until then the integration is read-only.
 - `pion_power.set_tou_schedule` — coarse write of the workmode grid-charge windows (`periods` list).
   Both services require *Allow schedule writes*.
 
+## Work modes & SOC parameters
+
+The inverter runs in one of several **work modes**, selected by the raw `EmsMode` value
+(the *Work Mode* number entity). Each mode has its own SOC threshold, and **only the parameter
+belonging to the currently active mode takes effect** — changing, say, *Backup SOC* while the
+inverter is in TOU mode does nothing until you also switch `EmsMode` to backup. (These mappings are
+reverse-engineered; only `EmsMode 7` = Time-of-Use is confirmed. Map the other mode numbers by
+switching modes in the Pion app and watching the *Work Mode* value.)
+
+| Mode | What it does | Its SOC parameter |
+|------|--------------|-------------------|
+| **Time-of-Use** (`EmsMode 7`, confirmed) | Follows the TOU schedule/template (charge/discharge windows). The battery still discharges to cover load before importing, down to the reserve floor. | **TOU Reserved SOC** — the floor the battery is held to (your "keep N% in reserve" lever; the only one active in TOU mode). |
+| **Self-Consumption** | Maximize use of own solar: cover load from solar/battery, bank surplus. | **Self-Use SOC** — floor the battery discharges to for self-use before holding the rest in reserve. |
+| **Backup / UPS** | Keep the battery charged for blackout protection. | **Backup SOC** — minimum SOC reserved for an outage; the inverter won't discharge below it and tops it up from solar/grid. |
+| **Economy** | Charge/discharge by the inverter's own peak/valley clock (`EconomyModeInfos`), an alternative to TOU. | **Economy SOC** — the floor during economy operation. |
+| **Force charge / discharge** | One-shot push to a target SOC. | **Force Charge SOC** — charge *up to* this % then stop. **Force Discharge SOC** — discharge *down to* this % then stop. |
+
+**Other work-mode controls:** *Max Charge Power* / *Max Discharge Power* (caps, %).
+
+> ⚠️ The earlier `force_charge` / `force_discharge` **services** were removed in 0.5.0 (they could
+> trigger solar curtailment on AC-coupled systems). The Force Charge/Discharge **SOC number
+> entities** remain as raw work-mode fields but only matter if a force mode is engaged.
+
 ## Installation (via HACS)
 
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/jc22zhao/pion-power-ha`,
@@ -101,9 +124,8 @@ password), Home Assistant prompts you to re-authenticate automatically.
   Default poll interval is 30 s (configurable in the integration options).
 - **Asynchronous control:** a write is accepted immediately but the device confirms it after
   ~8 seconds; the entity updates on the next poll.
-- **Mode-gated parameters:** only the parameters of the *active* `EmsMode` take effect. (Observed:
-  `EmsMode 7` = Time-of-Use.) Map the mode numbers by switching modes in the Pion app and watching
-  the Work Mode value.
+- **Mode-gated parameters:** only the parameters of the *active* `EmsMode` take effect — see
+  [Work modes & SOC parameters](#work-modes--soc-parameters) above.
 - Power units are labelled kW / kWh — verify against your app and adjust `const.py` if needed.
 - **Data source:** live power/SOC come from the **inverter's own signals**
   (`GetRealDataByDeviceCode` — the app's "inverter" view), which are accurate. The
