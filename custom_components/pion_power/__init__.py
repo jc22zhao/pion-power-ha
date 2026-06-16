@@ -29,7 +29,7 @@ from .const import (
     SERVICE_SET_TOU_TEMPLATE,
 )
 from .coordinator import PionCoordinator
-from .schedule import build_stra_day_periods
+from .schedule import build_stra_day_periods, workmode_charge_periods
 
 PLATFORMS = [
     Platform.SENSOR,
@@ -208,10 +208,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
             new_id = result.get("TemplateId") or template_id
             if call.data.get("activate", True) and new_id:
                 await client.choose_tou_template(coordinator.station, new_id)
-            if call.data.get("reserved_soc") is not None:
-                await client.set_workmode_field(
-                    coordinator.station, "TOUModeReservedSoc", int(call.data["reserved_soc"])
-                )
+            # The inverter executes the workmode, not the template — push the
+            # grid-charge windows so the schedule actually takes effect.
+            all_periods = [p for g in call.data["groups"] for p in g["periods"]]
+            await client.set_tou_schedule(
+                coordinator.station,
+                workmode_charge_periods(all_periods),
+                reserved_soc=call.data.get("reserved_soc"),
+            )
         except PionApiError as err:
             raise HomeAssistantError(f"Failed to set TOU template: {err}") from err
         await coordinator.async_request_refresh()

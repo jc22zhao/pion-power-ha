@@ -13,7 +13,12 @@ from homeassistant.util import dt as dt_util
 
 from .api import PionApiError, PionAuthError, PionClient, PionKicked
 from .const import DOMAIN
-from .schedule import apply_periods_to_template, blank_period, primary_periods
+from .schedule import (
+    apply_periods_to_template,
+    blank_period,
+    primary_periods,
+    workmode_charge_periods,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,12 +111,18 @@ class PionCoordinator(DataUpdateCoordinator):
                 "Schedule writing is disabled. Enable 'Allow schedule writes' in "
                 "the Pion Power integration options once your system is healthy."
             )
+        draft = self.get_draft()
         template = self._active_template()
-        payload = apply_periods_to_template(template, self.get_draft())
+        payload = apply_periods_to_template(template, draft)
         template_id = payload.get("TemplateId")
         await self.client.add_or_update_template(payload)
         if template_id:
             await self.client.choose_tou_template(self.station, template_id)
+        # The inverter executes the workmode, not the template — push the
+        # grid-charge windows so the edited schedule actually takes effect.
+        await self.client.set_tou_schedule(
+            self.station, workmode_charge_periods(draft), ensure_tou_mode=True
+        )
         self._draft = None
         self._draft_dirty = False
         await self.async_request_refresh()

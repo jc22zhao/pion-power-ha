@@ -62,6 +62,13 @@ The integration reads only the *active* template; to switch which template is ac
 app. Multi-group templates (separate weekday/weekend or seasonal rules) are shown in full by the
 **TOU Schedule** sensor; the period entities edit the primary rule-group.
 
+> **How a schedule actually executes.** The HAS runs the inverter **work mode** (`TOUModeStraPeriods`),
+> not the template — writing the template alone does nothing. So Apply (and `set_tou_template`) write
+> the template *and* push the **grid-charge windows** (periods with **Grid Charge** on) to the work
+> mode, where they take effect within ~30–60 s. Discharge isn't an explicit window: outside the
+> charge windows the inverter runs default self-consumption (covers load from solar/battery) down to
+> the **reserve floor** (`TOU Reserved SOC`) — so that reserve is your discharge/"hold" lever.
+
 **Writes are off by default.** Enable *Allow schedule writes* in the integration options
 (Settings → Devices & Services → Pion Power → Configure) to allow Apply and the number/work-mode
 controls to push to the inverter. Until then the integration is read-only.

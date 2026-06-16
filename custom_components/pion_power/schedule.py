@@ -171,6 +171,33 @@ def build_stra_day_periods(groups: list[dict]) -> list[dict]:
     return out
 
 
+def workmode_charge_periods(periods: list[dict]) -> list[dict]:
+    """Extract the grid-charge windows for the inverter WORKMODE.
+
+    The HAS executes the workmode's TOUModeStraPeriods, NOT the template — so a
+    schedule only takes effect once its grid-charge windows are written there.
+    Discharge/daytime is default self-consumption bounded by the reserve floor,
+    so only GridChargeEn periods need pushing. RunPower stays in percent (the
+    workmode's unit); an end time of "00:00" becomes "23:59" (workmode form)."""
+    out = []
+    for p in periods:
+        if not p.get("GridChargeEn"):
+            continue
+        end = p.get("EndTime")
+        out.append(
+            {
+                "StartTime": p.get("StartTime"),
+                "EndTime": "23:59" if end == "00:00" else end,
+                "ChargeOrDis": 1,
+                "SOC": int(p.get("SOC") or 0),
+                "RunPower": int(p.get("RunPower") or 100),
+                "GridChargeEn": True,
+                "SellGridEn": bool(p.get("SellGridEn")),
+            }
+        )
+    return out
+
+
 def blank_period() -> dict:
     return {
         "StartTime": "00:00", "EndTime": "00:00", "SOC": 100, "RunPower": 100,
