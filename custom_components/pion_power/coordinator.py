@@ -13,12 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import PionApiError, PionAuthError, PionClient, PionKicked
 from .const import DOMAIN
-from .schedule import (
-    apply_periods_to_template,
-    blank_period,
-    primary_periods,
-    workmode_charge_periods,
-)
+from .schedule import blank_period, draft_to_workmode, workmode_draft
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,14 +64,16 @@ class PionCoordinator(DataUpdateCoordinator):
     def draft_dirty(self) -> bool:
         return self._draft_dirty
 
-    def _active_template(self) -> dict:
-        return (self.data or {}).get("template", {}) or {}
+    def _workmode(self) -> dict:
+        return (self.data or {}).get("workmode", {}) or {}
 
     def get_draft(self) -> list[dict]:
-        """Editable period list for the active template's primary group. Tracks
-        the server until the user edits, then holds the draft until Apply/Reload."""
+        """Editable period list from the inverter WORKMODE (the executing
+        schedule). Tracks the server until the user edits, then holds the draft
+        until Apply/Reload — so an autoscheduler writing the workmode is picked
+        up automatically while not clobbering an in-progress manual edit."""
         if self._draft is None or not self._draft_dirty:
-            self._draft = primary_periods(self._active_template())
+            self._draft = workmode_draft(self._workmode())
         return self._draft
 
     def _touch(self) -> None:
@@ -105,23 +102,15 @@ class PionCoordinator(DataUpdateCoordinator):
         self.async_update_listeners()
 
     async def apply_draft(self) -> None:
-        """Write the staged schedule to the active template and activate it."""
+        """Write the staged schedule straight to the inverter WORKMODE (what it
+        executes) via SetStationWorkMode."""
         if not self.allow_write:
             raise PionApiError(
                 "Schedule writing is disabled. Enable 'Allow schedule writes' in "
                 "the Pion Power integration options once your system is healthy."
             )
-        draft = self.get_draft()
-        template = self._active_template()
-        payload = apply_periods_to_template(template, draft)
-        template_id = payload.get("TemplateId")
-        await self.client.add_or_update_template(payload)
-        if template_id:
-            await self.client.choose_tou_template(self.station, template_id)
-        # The inverter executes the workmode, not the template — push the
-        # grid-charge windows so the edited schedule actually takes effect.
         await self.client.set_tou_schedule(
-            self.station, workmode_charge_periods(draft), ensure_tou_mode=True
+            self.station, draft_to_workmode(self.get_draft()), ensure_tou_mode=True
         )
         self._draft = None
         self._draft_dirty = False

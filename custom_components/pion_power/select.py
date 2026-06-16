@@ -9,8 +9,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .entity import PionPeriodEntity, setup_period_entities
 
-# ChargeOrDis: 0=auto (hold/charge toward SOC, discharge above it), 1=charge, 2=discharge.
-MODE_TO_CODE = {"Auto": 0, "Charge": 1, "Discharge": 2}
+# Workmode ChargeOrDis is 1=charge / 2=discharge (no "auto").
+MODE_TO_CODE = {"Charge": 1, "Discharge": 2}
 CODE_TO_MODE = {v: k for k, v in MODE_TO_CODE.items()}
 
 
@@ -41,7 +41,7 @@ class PionPeriodModeSelect(PionPeriodEntity, SelectEntity):
         period = self._period
         if period is None:
             return None
-        return CODE_TO_MODE.get(int(period.get("ChargeOrDis") or 0), "Auto")
+        return CODE_TO_MODE.get(int(period.get("ChargeOrDis") or 1), "Charge")
 
     async def async_select_option(self, option: str) -> None:
-        self.coordinator.edit_period(self._index, "ChargeOrDis", MODE_TO_CODE.get(option, 0))
+        self.coordinator.edit_period(self._index, "ChargeOrDis", MODE_TO_CODE.get(option, 1))

@@ -199,7 +199,50 @@ def workmode_charge_periods(periods: list[dict]) -> list[dict]:
 
 
 def blank_period() -> dict:
+    # New editor period defaults to a (non-grid) charge window; the user adjusts.
     return {
-        "StartTime": "00:00", "EndTime": "00:00", "SOC": 100, "RunPower": 100,
-        "ChargeOrDis": 0, "GridChargeEn": False, "SellGridEn": False,
+        "StartTime": "00:00", "EndTime": "00:00", "SOC": 20, "RunPower": 100,
+        "ChargeOrDis": 1, "GridChargeEn": False, "SellGridEn": False,
     }
+
+
+def workmode_draft(workmode: dict) -> list[dict]:
+    """Editable period list from the inverter's WORKMODE (what actually runs).
+
+    The HAS executes workmode TOUModeStraPeriods, not the template, so the editor
+    reads/writes here. RunPower is already a percentage; ChargeOrDis is 1=charge /
+    2=discharge (no 'auto')."""
+    out = []
+    for p in workmode.get("TOUModeStraPeriods") or []:
+        out.append(
+            {
+                "StartTime": p.get("StartTime"),
+                "EndTime": p.get("EndTime"),
+                "SOC": int(p.get("SOC") or 0),
+                "RunPower": int(p.get("RunPower") or 100),
+                "ChargeOrDis": int(p.get("ChargeOrDis") or 1),
+                "GridChargeEn": bool(p.get("GridChargeEn")),
+                "SellGridEn": bool(p.get("SellGridEn")),
+            }
+        )
+    return out
+
+
+def draft_to_workmode(periods: list[dict]) -> list[dict]:
+    """Editor draft -> workmode TOUModeStraPeriods for SetStationWorkMode.
+    End time "00:00" -> "23:59" (workmode form); types normalized."""
+    out = []
+    for p in periods:
+        end = p.get("EndTime")
+        out.append(
+            {
+                "StartTime": p.get("StartTime"),
+                "EndTime": "23:59" if end == "00:00" else end,
+                "SOC": int(p.get("SOC") or 0),
+                "RunPower": int(p.get("RunPower") or 100),
+                "ChargeOrDis": int(p.get("ChargeOrDis") or 1),
+                "GridChargeEn": bool(p.get("GridChargeEn")),
+                "SellGridEn": bool(p.get("SellGridEn")),
+            }
+        )
+    return out

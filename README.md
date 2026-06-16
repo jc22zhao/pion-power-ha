@@ -48,26 +48,25 @@ during cheap grid hours, then return to self-consumption.
 
 **Schedule editor** (built-in entities — no custom dashboards or templates needed)
 
-Each period of your **active** TOU template appears as a **TOU Period N** sub-device with native
-entities — **Start**, **End** (time), **Mode** (select: Auto / Charge / Discharge), **Target SOC**,
-**Run Power** (number), **Grid Charge**, **Sell to Grid** (switch). The number of period devices
-tracks your schedule automatically.
+The editor reads and writes the inverter's **work mode** (`TOUModeStraPeriods`) — the schedule the
+HAS actually executes. Each period appears as a **TOU Period N** sub-device with native entities —
+**Start**, **End** (time), **Mode** (select: Charge / Discharge), **Target SOC**, **Run Power**
+(number), **Grid Charge**, **Sell to Grid** (switch). The number of period devices tracks the
+schedule automatically.
 
 Edits are staged locally; the HEMS device has three buttons:
-- **Apply schedule** — write the staged schedule to the inverter (one write) and activate it.
-- **Reload schedule from server** — discard staged edits.
+- **Apply schedule** — write the staged periods straight to the work mode (one `SetStationWorkMode`).
+- **Reload schedule from server** — discard staged edits and re-read the work mode.
 - **Add TOU period** — append a new period (each period device also has a **Delete period** button).
 
-The integration reads only the *active* template; to switch which template is active, use the Pion
-app. Multi-group templates (separate weekday/weekend or seasonal rules) are shown in full by the
-**TOU Schedule** sensor; the period entities edit the primary rule-group.
-
-> **How a schedule actually executes.** The HAS runs the inverter **work mode** (`TOUModeStraPeriods`),
-> not the template — writing the template alone does nothing. So Apply (and `set_tou_template`) write
-> the template *and* push the **grid-charge windows** (periods with **Grid Charge** on) to the work
-> mode, where they take effect within ~30–60 s. Discharge isn't an explicit window: outside the
-> charge windows the inverter runs default self-consumption (covers load from solar/battery) down to
-> the **reserve floor** (`TOU Reserved SOC`) — so that reserve is your discharge/"hold" lever.
+> **How a schedule executes.** The HAS runs the work mode, not the TOU template — so the editor
+> (and the `set_tou_schedule` service) write there directly; changes take effect within ~30–60 s.
+> The periods are **charge windows** (grid-charge on a window) and explicit discharge windows.
+> Outside any period the inverter runs default self-consumption (covers load from solar/battery)
+> down to the **reserve floor** (`TOU Reserved SOC`) — so that reserve is your discharge/"hold" lever.
+> Because the editor and `set_tou_schedule` share this one source, a manual edit and an automation
+> (e.g. a nightly autoscheduler) stay in sync — the editor reflects whatever the automation last
+> wrote, and an in-progress manual edit is held until you Apply or Reload.
 
 **Writes are off by default.** Enable *Allow schedule writes* in the integration options
 (Settings → Devices & Services → Pion Power → Configure) to allow Apply and the number/work-mode
