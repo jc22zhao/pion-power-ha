@@ -152,6 +152,19 @@ password), Home Assistant prompts you to re-authenticate automatically.
   (`GetRealDataByDeviceCode` — the app's "inverter" view), which are accurate. The
   station aggregate (`GetRealDataByStationCode`, the app's "energy station" view)
   can over-report PV, so it's only used as a fallback and for daily charge/discharge.
+- **⚠️ Daily / per-period kWh can under-count across gaps.** The lifetime accumulators
+  (`*_total`) are exact and never lose data — they're read straight from the meter and
+  keep counting through any outage. But *daily* energy figures derived from them (e.g. a
+  `utility_meter` with `periodically_resetting: false`, or the cloud daily-stat sensors)
+  can come up short if the **HEMS/DTU goes offline** or **Home Assistant disconnects or
+  restarts** during the day. On recovery the meter re-baselines to the current reading
+  rather than back-filling the usage that occurred while the source was unavailable, so
+  that slice is dropped from the day's total (negligible for a brief restart; on the order
+  of ~1–3 kWh for an hour offline). The **lifetime totals stay correct**, so if you need
+  exact daily numbers, reconcile your daily meter against the accumulator: snapshot the
+  accumulator at the start of the day and, on reconnect, add any shortfall
+  (`accumulator_now − day_start − sum_of_periods`) to the currently-active period via
+  `utility_meter.calibrate`.
 
 ## Background
 
