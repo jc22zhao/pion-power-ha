@@ -11,8 +11,9 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     HomeAssistantError,
 )
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .api import PionApiError, PionAuthError, PionClient
 from .const import (
@@ -227,6 +228,22 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry
+) -> bool:
+    """Allow removing a device from the UI once it has no entities left.
+
+    The pre-2.0 period editor created 'TOU Period N' sub-devices; 2.0+ replaced
+    them with 'Charge Window N'. After their old entities are deleted those
+    period devices are orphaned. Devices the integration still provides keep
+    their entities (recreated on reload), so only genuinely empty/stale devices
+    can be removed this way."""
+    ent_reg = er.async_get(hass)
+    return not er.async_entries_for_device(
+        ent_reg, device_entry.id, include_disabled_entities=True
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

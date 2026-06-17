@@ -91,6 +91,8 @@ and unused in the charge-window + reserve-floor model the integration runs. (The
 > If your install still shows a `work_mode_raw_emsmode`, `apply_schedule`, or `reload_schedule`
 > entity (greyed-out / unavailable), that's a **stale registry entry** from an older version — the
 > current integration doesn't create it. Safe to delete from Settings → Devices & Services → Entities.
+> Likewise, the pre-2.0 **TOU Period N** sub-devices are obsolete; once their entities are gone you
+> can remove each orphaned device from its device page (**⋮ → Delete**, available since 2.1.1).
 
 <details>
 <summary><b>Reference:</b> the inverter's work modes (not controllable from this integration)</summary>
