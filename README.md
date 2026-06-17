@@ -76,28 +76,38 @@ directly. The schedule is just **charge windows** + the reserve floor; discharge
 - `pion_power.set_tou_template` — legacy template writer; the HAS doesn't execute templates, so
   prefer `set_tou_schedule`.
 
-## Work modes & SOC parameters
+## Work mode & reserve floor
 
-The inverter runs in one of several **work modes**, selected by the raw `EmsMode` value
-(the *Work Mode* number entity). Each mode has its own SOC threshold, and **only the parameter
-belonging to the currently active mode takes effect** — changing, say, *Backup SOC* while the
-inverter is in TOU mode does nothing until you also switch `EmsMode` to backup. (These mappings are
-reverse-engineered; only `EmsMode 7` = Time-of-Use is confirmed. Map the other mode numbers by
-switching modes in the Pion app and watching the *Work Mode* value.)
+The integration keeps the inverter in **Time-of-Use** mode (`EmsMode 7`) and exposes a single SOC
+lever — the **Reserve Floor SOC** (`TOUModeReservedSoc`): the inverter covers load from the battery
+down to this level, then holds the rest (your "keep N% in reserve" / blackout-reserve lever).
+
+It does **not** expose a work-mode selector or the other modes' SOC parameters. Earlier versions
+surfaced a raw *Work Mode* (`EmsMode`) number, a *Max Power* field, and the Self-Use / Backup /
+Economy / Force-charge-discharge SOC parameters; these were **removed** because they're mode-gated
+and unused in the charge-window + reserve-floor model the integration runs. (The `force_charge` /
+`force_discharge` services were likewise removed in 0.5.0 for the solar-curtailment risk.)
+
+> If your install still shows a `work_mode_raw_emsmode`, `apply_schedule`, or `reload_schedule`
+> entity (greyed-out / unavailable), that's a **stale registry entry** from an older version — the
+> current integration doesn't create it. Safe to delete from Settings → Devices & Services → Entities.
+
+<details>
+<summary><b>Reference:</b> the inverter's work modes (not controllable from this integration)</summary>
+
+The inverter itself supports several work modes, each with its own SOC threshold, where only the
+active mode's parameter takes effect. These mappings are reverse-engineered; only `EmsMode 7` = TOU
+is confirmed. The integration runs the inverter in TOU mode and does not switch between these.
 
 | Mode | What it does | Its SOC parameter |
 |------|--------------|-------------------|
-| **Time-of-Use** (`EmsMode 7`, confirmed) | Follows the TOU schedule/template (charge/discharge windows). The battery still discharges to cover load before importing, down to the reserve floor. | **TOU Reserved SOC** — the floor the battery is held to (your "keep N% in reserve" lever; the only one active in TOU mode). |
+| **Time-of-Use** (`EmsMode 7`, confirmed) | Follows the TOU schedule (charge windows). The battery still discharges to cover load before importing, down to the reserve floor. | **TOU Reserved SOC** — the floor the battery is held to (the only one exposed by this integration). |
 | **Self-Consumption** | Maximize use of own solar: cover load from solar/battery, bank surplus. | **Self-Use SOC** — floor the battery discharges to for self-use before holding the rest in reserve. |
 | **Backup / UPS** | Keep the battery charged for blackout protection. | **Backup SOC** — minimum SOC reserved for an outage; the inverter won't discharge below it and tops it up from solar/grid. |
 | **Economy** | Charge/discharge by the inverter's own peak/valley clock (`EconomyModeInfos`), an alternative to TOU. | **Economy SOC** — the floor during economy operation. |
 | **Force charge / discharge** | One-shot push to a target SOC. | **Force Charge SOC** — charge *up to* this % then stop. **Force Discharge SOC** — discharge *down to* this % then stop. |
 
-> This table is background on the inverter's modes. In practice the integration runs the inverter in
-> **Time-of-Use** mode and exposes only the **Reserve Floor SOC**; the other mode SOC parameters
-> (Self-Use / Backup / Economy / Force charge-discharge) and the raw Work Mode / Max Power fields are
-> **no longer surfaced as entities** (they're unused in the charge-window + reserve-floor model).
-> The `force_charge` / `force_discharge` services were removed in 0.5.0 (solar-curtailment risk).
+</details>
 
 ## Installation (via HACS)
 
@@ -132,8 +142,9 @@ password), Home Assistant prompts you to re-authenticate automatically.
   Default poll interval is 30 s (configurable in the integration options).
 - **Asynchronous control:** a write is accepted immediately but the device confirms it after
   ~8 seconds; the entity updates on the next poll.
-- **Mode-gated parameters:** only the parameters of the *active* `EmsMode` take effect — see
-  [Work modes & SOC parameters](#work-modes--soc-parameters) above.
+- **Reserve floor:** the inverter runs in TOU mode, where the **Reserve Floor SOC** is the active
+  SOC lever; other modes' SOC parameters are mode-gated and not exposed — see
+  [Work mode & reserve floor](#work-mode--reserve-floor) above.
 - Power units are labelled kW / kWh — verify against your app and adjust `const.py` if needed.
 - **Data source:** live power/SOC come from the **inverter's own signals**
   (`GetRealDataByDeviceCode` — the app's "inverter" view), which are accurate. The
