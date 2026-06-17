@@ -28,6 +28,9 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 - Battery State of Charge (%)
 - Battery / PV / Grid / Load power (kW)
 - Battery daily charge & discharge, PV daily energy (kWh)
+- Lifetime cumulative energy accumulators read straight from the meter — home
+  consumption, battery charge & discharge totals (kWh). Monotonic and never
+  reset, so they make ideal sources for `utility_meter` (TOU breakdowns, etc.)
 - HEMS online status
 - **TOU Schedule** — a read-only summary of the active schedule (the work-mode
   charge windows + reserve), with the periods in its attributes.

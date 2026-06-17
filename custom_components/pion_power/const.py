@@ -36,6 +36,14 @@ SENSORS = [
     {"key": "EsDailyCharge", "name": "Battery Daily Charge", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
     {"key": "EsDailyDisCharge", "name": "Battery Daily Discharge", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
     {"key": "PvDailyElectricQuantity", "signal": "10210002", "name": "PV Daily Energy", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    # Lifetime cumulative accumulators read straight from the CHINT "Home Energy"
+    # meter via the device feed (monotonic, never reset). These are the accurate
+    # source for the TOU utility meters -- unlike the GetHomeData daily stats
+    # (StationUse/FromGrid/...), which are UTC-bucketed cloud aggregates that zero
+    # out at 00:00 UTC (8pm local) and then read 0/offline for hours.
+    {"key": "HomeConsumptionTotal", "signal": "10220010", "name": "Home Consumption Total", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "BatteryChargeTotal", "signal": "10200008", "name": "Battery Charge Total", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
+    {"key": "BatteryDischargeTotal", "signal": "10200009", "name": "Battery Discharge Total", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
 ]
 
 # Daily-energy sensors from GetHomeData (today's totals). Each value is obj["Value"].
