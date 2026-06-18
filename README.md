@@ -32,7 +32,7 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
   consumption, battery charge & discharge totals (kWh). Monotonic and never
   reset, so they make ideal sources for `utility_meter` (TOU breakdowns, etc.)
 - HEMS online status
-- **Grid Power** (binary sensor) — ON = grid available, OFF = grid outage/blackout,
+- **Grid Power Available** (binary sensor) — ON = grid available, OFF = grid outage/blackout,
   from the inverter's grid-outage flag. Goes unavailable if the device stops
   reporting (e.g. an outage that also drops the DTU's internet), so it never shows
   a stale value. *Cloud-based: reliable blackout alerting needs the networking gear

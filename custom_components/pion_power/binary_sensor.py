@@ -43,7 +43,7 @@ class PionGridPower(PionBaseEntity, BinarySensorEntity):
     unavailable when the device feed isn't reporting (e.g. a blackout that also
     takes the DTU's internet down), so it never shows a stale 'grid present'."""
 
-    _attr_name = "Grid Power"
+    _attr_name = "Grid Power Available"
     _attr_device_class = BinarySensorDeviceClass.POWER
     _GRID_OUTAGE_SIGNAL = "10271047"
 
