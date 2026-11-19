@@ -46,6 +46,30 @@ SENSORS = [
     {"key": "BatteryDischargeTotal", "signal": "10200009", "name": "Battery Discharge Total", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},
 ]
 
+# Battery (BMS) readings from the same device feed. The BMS signals refresh less
+# often than the power signals (every few minutes), and while the BMS is not
+# reporting - e.g. for a few minutes after an inverter restart - every one of
+# them reads 0. A cell can genuinely sit at 0 C (the pack is outdoors), but a
+# cell voltage of 0 is never real, so a 0 V "high cell" marks the whole group
+# as unavailable rather than recording fake zeros.
+#
+# The current limits are what the BMS currently allows the inverter to draw or
+# push, and fall when the cells are cold - they show cold-weather derating
+# directly. "Battery temperature (BMS)" (10200019) is deliberately absent: it
+# reads 0 on this unit even when the cell readings are live.
+BMS_VALID_SIGNAL = "10200031"  # highest cell voltage
+BMS_SENSORS = [
+    {"key": "CellTempHigh", "signal": "10200033", "name": "Battery Cell Temperature High", "unit": "°C", "device_class": "temperature", "state_class": "measurement", "precision": 0},
+    {"key": "CellTempLow", "signal": "10200034", "name": "Battery Cell Temperature Low", "unit": "°C", "device_class": "temperature", "state_class": "measurement", "precision": 0},
+    {"key": "CellVoltageHigh", "signal": "10200031", "name": "Battery Cell Voltage High", "unit": "V", "device_class": "voltage", "state_class": "measurement", "precision": 3},
+    {"key": "CellVoltageLow", "signal": "10200032", "name": "Battery Cell Voltage Low", "unit": "V", "device_class": "voltage", "state_class": "measurement", "precision": 3},
+    # Highest minus lowest cell, in mV. A balanced pack stays within a few mV;
+    # a spread that widens near full charge is what makes the BMS stop short of 100%.
+    {"key": "CellVoltageSpread", "signals": ("10200031", "10200032"), "scale": 1000, "name": "Battery Cell Voltage Spread", "unit": "mV", "device_class": "voltage", "state_class": "measurement", "precision": 0},
+    {"key": "BmsChargeLimit", "signal": "10200014", "name": "BMS Charge Current Limit", "unit": "A", "device_class": "current", "state_class": "measurement", "precision": 0},
+    {"key": "BmsDischargeLimit", "signal": "10200015", "name": "BMS Discharge Current Limit", "unit": "A", "device_class": "current", "state_class": "measurement", "precision": 0},
+]
+
 # Daily-energy sensors from GetHomeData (today's totals). Each value is obj["Value"].
 HOME_SENSORS = [
     {"key": "FromGrid", "name": "Grid Import Daily", "unit": "kWh", "device_class": "energy", "state_class": "total_increasing"},

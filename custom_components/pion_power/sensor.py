@@ -6,7 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, HOME_SENSORS, SENSORS
+from .const import BMS_SENSORS, BMS_VALID_SIGNAL, DOMAIN, HOME_SENSORS, SENSORS
 from .entity import PionBaseEntity
 from .schedule import humanize_groups, humanize_period, template_groups
 
@@ -18,6 +18,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [PionSensor(coordinator, entry, d) for d in SENSORS]
     if coordinator.device_code:
         entities += [PionHomeSensor(coordinator, entry, d) for d in HOME_SENSORS]
+        entities += [PionBmsSensor(coordinator, entry, d) for d in BMS_SENSORS]
     entities.append(PionTouScheduleSensor(coordinator, entry))
     async_add_entities(entities)
 
@@ -34,6 +35,8 @@ class _Base(PionBaseEntity, SensorEntity):
             self._attr_device_class = definition["device_class"]
         if definition.get("state_class"):
             self._attr_state_class = definition["state_class"]
+        if definition.get("precision") is not None:
+            self._attr_suggested_display_precision = definition["precision"]
 
 
 class PionSensor(_Base):
@@ -61,6 +64,39 @@ class PionHomeSensor(_Base):
             return float(item)
         except (TypeError, ValueError):
             return None
+
+
+class PionBmsSensor(_Base):
+    """A battery (BMS) reading from the device feed; see BMS_SENSORS in const.py.
+
+    Unavailable while the BMS is not reporting (high-cell voltage reads 0)."""
+
+    def __init__(self, coordinator, entry, definition: dict) -> None:
+        super().__init__(coordinator, entry, definition)
+        self._signals = definition.get("signals")
+        self._scale = definition.get("scale", 1)
+
+    def _value(self, signal: str) -> float | None:
+        item = (self.coordinator.data or {}).get("device", {}).get(signal)
+        if not isinstance(item, dict):
+            return None
+        try:
+            return float(item.get("SignalValue"))
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def available(self) -> bool:
+        return super().available and (self._value(BMS_VALID_SIGNAL) or 0) > 0
+
+    @property
+    def native_value(self):
+        if self._signals:
+            high, low = (self._value(sig) for sig in self._signals)
+            if high is None or low is None:
+                return None
+            return round((high - low) * self._scale, 1)
+        return self._value(self._signal)
 
 
 class PionTouScheduleSensor(PionBaseEntity, SensorEntity):

@@ -31,6 +31,12 @@ Pion Power app login — no installer account, no extra hardware, no manufacture
 - Lifetime cumulative energy accumulators read straight from the meter — home
   consumption, battery charge & discharge totals (kWh). Monotonic and never
   reset, so they make ideal sources for `utility_meter` (TOU breakdowns, etc.)
+- **Battery health (BMS)** — highest/lowest cell temperature (°C), highest/lowest
+  cell voltage (V), the cell voltage spread (mV), and the charge/discharge current
+  limits the BMS is currently allowing (A). The limits drop when the cells are
+  cold, so they show cold-weather derating directly; a spread that widens near full
+  charge shows cell imbalance. These refresh every few minutes and go unavailable
+  while the BMS isn't reporting (e.g. just after an inverter restart).
 - HEMS online status
 - **Grid Power Available** (binary sensor) — ON = grid available, OFF = grid outage/blackout,
   from the inverter's grid-outage flag. Goes unavailable if the device stops
